@@ -30,13 +30,6 @@ const userValidators = {
 
   // Create user validation
   createUser: Joi.object({
-    username: usernamePattern
-      .required()
-      .messages({
-        'string.min': 'Username must be at least 3 characters long',
-        'string.max': 'Username must not exceed 30 characters',
-        'any.required': 'Username is required'
-      }),
     email: emailPattern
       .required()
       .messages({
@@ -55,23 +48,11 @@ const userValidators = {
         'string.min': 'Password must be at least 6 characters long',
         'string.max': 'Password must not exceed 128 characters',
         'any.required': 'Password is required'
-      }),
-    role: Joi.string()
-      .valid('admin', 'user')
-      .default('user')
-      .messages({
-        'any.only': 'Role must be either admin or user'
       })
   }),
 
   // Update user validation
   updateUser: Joi.object({
-    username: usernamePattern
-      .optional()
-      .messages({
-        'string.min': 'Username must be at least 3 characters long',
-        'string.max': 'Username must not exceed 30 characters'
-      }),
     email: emailPattern
       .optional()
       .messages({

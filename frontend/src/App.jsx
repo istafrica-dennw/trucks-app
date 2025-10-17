@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import AdminDashboard from './pages/AdminDashboard';
+import Users from './pages/Users';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import './App.css';
 
@@ -52,6 +53,14 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute requireAdmin={true}>
             <AdminDashboard />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/admin/users" 
+        element={
+          <ProtectedRoute requireAdmin={true}>
+            <Users />
           </ProtectedRoute>
         } 
       />

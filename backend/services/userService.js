@@ -30,7 +30,6 @@ class UserService {
       
       if (search) {
         query.$or = [
-          { username: { $regex: search, $options: 'i' } },
           { email: { $regex: search, $options: 'i' } },
           { phone: { $regex: search, $options: 'i' } }
         ];
@@ -112,7 +111,8 @@ class UserService {
    */
   async createUser(userData) {
     try {
-      const { username, email, phone, password, role = 'user' } = userData;
+      const { email, phone, password } = userData;
+      const role = 'user'; // Always default to 'user' role
 
       // Check for existing user
       const existingUser = await User.findOne({
@@ -133,7 +133,6 @@ class UserService {
 
       // Create user
       const user = await User.create({
-        username,
         email,
         phone,
         password,
@@ -144,7 +143,6 @@ class UserService {
 
       logger.info('User created', {
         userId: user._id,
-        username: user.username,
         email: user.email,
         phone: user.phone,
         role: user.role
@@ -172,7 +170,7 @@ class UserService {
    */
   async updateUser(userId, updateData) {
     try {
-      const { username, email, phone, role, isActive } = updateData;
+      const { email, phone, role, isActive } = updateData;
 
       // Check for duplicate email/phone
       if (email || phone) {
@@ -198,7 +196,6 @@ class UserService {
 
       // Prepare update data
       const updateFields = {};
-      if (username) updateFields.username = username;
       if (email) {
         updateFields.email = email;
         updateFields.emailVerified = false; // Reset email verification
@@ -219,7 +216,8 @@ class UserService {
 
       logger.info('User updated', {
         userId: user._id,
-        username: user.username,
+        email: user.email,
+        phone: user.phone,
         updatedFields: Object.keys(updateFields)
       });
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import Sidebar from '../components/Sidebar';
 import MobileHeader from '../components/MobileHeader';
@@ -7,8 +7,10 @@ import RecentActivity from '../components/RecentActivity';
 import './AdminDashboard.css';
 
 const AdminDashboard = () => {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [userStats, setUserStats] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
@@ -18,7 +20,36 @@ const AdminDashboard = () => {
     setIsSidebarOpen(false);
   };
 
-  // Mock data - in real app, this would come from API
+  // Fetch user statistics
+  const fetchUserStats = async () => {
+    try {
+      const response = await fetch('http://localhost:5001/api/users/stats', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch user statistics');
+      }
+
+      const data = await response.json();
+      setUserStats(data.data);
+    } catch (error) {
+      console.error('Error fetching user stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (token) {
+      fetchUserStats();
+    }
+  }, [token]);
+
+  // Metrics with real data
   const metrics = [
     {
       title: 'Total Trucks',
@@ -55,8 +86,8 @@ const AdminDashboard = () => {
     },
     {
       title: 'System Users',
-      value: '8',
-      description: '2 admins, 6 users',
+      value: loading ? '...' : (userStats ? userStats.total.toString() : '0'),
+      description: userStats ? `${userStats.admins} admins, ${userStats.users} users` : 'Loading...',
       color: 'purple',
       icon: (
         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">

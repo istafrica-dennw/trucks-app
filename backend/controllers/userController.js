@@ -98,22 +98,21 @@ class UserController {
    */
   async createUser(req, res) {
     try {
-      const { username, email, phone, password, role } = req.body;
+      const { email, phone, password } = req.body;
 
       const userData = {
-        username,
         email,
         phone,
         password,
-        role: role || 'user'
+        role: 'user' // Always default to 'user' role
       };
 
       const user = await userService.createUser(userData);
 
       logger.info('User created via API', {
         userId: user._id,
-        username: user.username,
         email: user.email,
+        phone: user.phone,
         role: user.role,
         createdBy: req.user?.id
       });
@@ -147,10 +146,9 @@ class UserController {
   async updateUser(req, res) {
     try {
       const { id } = req.params;
-      const { username, email, phone, role, isActive } = req.body;
+      const { email, phone, role, isActive } = req.body;
 
       const updateData = {
-        username,
         email,
         phone,
         role,
@@ -161,7 +159,8 @@ class UserController {
 
       logger.info('User updated via API', {
         userId: user._id,
-        username: user.username,
+        email: user.email,
+        phone: user.phone,
         updatedFields: Object.keys(updateData).filter(key => updateData[key] !== undefined),
         updatedBy: req.user?.id
       });
