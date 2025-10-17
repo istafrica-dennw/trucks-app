@@ -1,0 +1,310 @@
+# Truck Management — Progressive Web App
+
+**Stack:** Node.js (Express), Vanilla JavaScript + HTML/CSS (PWA), MongoDB Atlas (free tier) with Mongoose
+
+**Repository layout (single repo, mono-project)**
+
+```
+truck-management-pwa/
+├── README.md
+├── package.json
+├── .env.example
+├── server/                     # Node.js backend (Express)
+│   ├── index.js                # App entry
+│   ├── routes/
+│   │   ├── auth.js
+│   │   ├── trucks.js
+│   │   ├── drivers.js
+│   │   └── reports.js
+│   ├── controllers/
+│   ├── models/
+│   │   ├── Truck.js
+│   │   ├── Driver.js
+│   │   └── DailyReport.js
+│   ├── services/
+│   └── utils/
+├── public/                     # Frontend (served as static files)
+│   ├── index.html
+│   ├── app.js                  # Vanilla JS app
+│   ├── styles.css
+│   ├── manifest.json           # PWA manifest
+│   ├── service-worker.js       # PWA service worker (caching, offline sync hooks)
+│   └── idb.js                  # small IndexedDB helper for offline storage
+└── scripts/
+    └── seed.js                 # optional sample data seeder
+```
+
+---
+
+## 1. Overview
+
+This document describes how to build and run a **Progressive Web App (PWA)** for truck management using **Node.js + Express** for the server, **Vanilla JavaScript + HTML/CSS** for the frontend, and **MongoDB Atlas** with **Mongoose** as the database. The app will be installable on phones (PWA), support offline data entry using **IndexedDB**, and sync to the server when online.
+
+Target features covered here:
+
+* Truck, Driver, Product entities
+* Daily reports (per truck) and aggregated reports (daily, weekly, monthly, custom range)
+* Offline entry and background sync
+* Installable PWA (manifest + service worker)
+* Authentication (basic JWT flow)
+
+---
+
+## 2. Architecture
+
+* **Frontend (public/)**: Static files served by Express. The client is a PWA with a service worker to cache assets and enable offline entry. It uses IndexedDB to hold offline records and a small sync queue.
+
+* **Backend (server/)**: REST API built with Express. Key responsibilities: authentication, validating & storing reports, reports aggregation endpoints, and sync endpoints to accept batched offline records.
+
+* **Database**: MongoDB Atlas (cloud-hosted). Use Mongoose to define schemas and interact with the database.
+
+---
+
+## 3. Data Models (Mongoose)
+
+### Truck (models/Truck.js)
+
+* `plate` (String, unique)
+* `make` (String, optional)
+* `model` (String, optional)
+* `currentDriver` (ObjectId -> Driver, optional)
+* `createdAt`, `updatedAt`
+
+### Driver (models/Driver.js)
+
+* `fullName` (String)
+* `phone` (String)
+* `nationalId` (String)
+* `createdAt`, `updatedAt`
+
+### DailyReport (models/DailyReport.js)
+
+* `truck` (ObjectId -> Truck)
+* `driver` (ObjectId -> Driver)
+* `date` (Date) // day for which this report applies (normalize to midnight)
+* `product` (String)
+* `income` (Number) // amount paid to company
+* `expenses` (Array of { type:String, amount:Number, note:String })
+* `notes` (String)
+* `createdAt`, `updatedAt`
+
+**Indexes:**
+
+* `DailyReport` should have a compound index on `{ truck: 1, date: 1 }` to speed per-truck queries.
+* Consider index on `date` for global queries.
+
+---
+
+## 4. API Endpoints (example)
+
+> All API endpoints are prefixed with `/api` in this example.
+
+### Auth
+
+* `POST /api/auth/login` — accepts `{ email, password }`, returns `{ token }` (JWT)
+* `POST /api/auth/register` — optional for admins to create users
+
+### Trucks
+
+* `GET /api/trucks` — list trucks
+* `POST /api/trucks` — create truck
+* `GET /api/trucks/:id` — get truck details
+* `PUT /api/trucks/:id` — update truck
+
+### Drivers
+
+* `GET /api/drivers`
+* `POST /api/drivers`
+* `PUT /api/drivers/:id`
+
+### Daily Reports
+
+* `POST /api/reports` — create single report (body: DailyReport fields)
+* `POST /api/reports/batch` — accept array of reports (used by offline sync)
+* `GET /api/reports?truckId=&start=&end=&group=day|week|month` — aggregated results or raw list
+* `GET /api/reports/summary?start=&end=` — global summary across all trucks
+
+**Validation:** Use express-validator or simple Joi/celebrate checks on incoming payloads.
+
+---
+
+## 5. Offline Strategy (PWA + IndexedDB)
+
+1. **Local store:** Use IndexedDB (helper `public/idb.js`) to store `draftReports` and a `syncQueue` when offline.
+2. **Service worker (service-worker.js):**
+
+   * Cache static assets (HTML, CSS, JS) and API responses if desired.
+   * Listen for `sync` events (Background Sync API) where supported, or fallback to an app-level reconnection check.
+3. **Sync flow:**
+
+   * When the client regains network, it sends `POST /api/reports/batch` with queued reports.
+   * Server validates and stores reports and returns status per item.
+   * On success, client clears synced items from IndexedDB.
+4. **Conflict resolution:**
+
+   * The `date + truck` key ensures only one report per truck per day. If server finds an existing report, it can either reject or merge depending on rules. For simplicity, prefer rejection with a specific error so client can prompt user.
+
+Notes:
+
+* iOS Safari historically had limited Background Sync but modern versions improved. Use a reconnection check as fallback (e.g., `online` event) and user-triggered "Sync now" button.
+
+---
+
+## 6. PWA Files (public/)
+
+### manifest.json (example)
+
+```json
+{
+  "name": "Truck Manager",
+  "short_name": "Trucks",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0b5cff",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
+```
+
+### service-worker.js (high-level)
+
+* Cache static assets during `install`.
+* Serve assets from cache first for fast load.
+* Provide a `fetch` handler that tries network for API calls and fallbacks to queue write requests when offline.
+
+(See code snippet in `public/service-worker.js` in repo)
+
+---
+
+## 7. Server: Example snippets
+
+### server/index.js (high-level)
+
+* Load `.env` (MONGODB_URI, JWT_SECRET, PORT)
+* Connect to Mongoose
+* Setup Express middleware (bodyParser, CORS, auth middleware)
+* Mount routes `/api/trucks`, `/api/drivers`, `/api/reports`
+* Error handling middleware
+
+### reports controller (pseudo)
+
+* `POST /api/reports/batch` — receive `[{ truck, date, product, income, expenses, driver }, ...]`
+
+  * Validate each item
+  * Use `bulkWrite` or loop with `insertMany`/`upsert` depending on desired behavior
+
+---
+
+## 8. Security & Auth
+
+* Use HTTPS (required for many PWA features). Use Let's Encrypt on your domain.
+* JWT for stateless sessions; store access token in secure `httpOnly` cookie or in memory + refresh tokens if necessary.
+* Validate and sanitize all incoming data (no direct injection to DB).
+* Rate-limit write endpoints if public-facing.
+
+---
+
+## 9. Environment & Setup (developer)
+
+1. **Create MongoDB Atlas free cluster**
+
+   * Sign up at MongoDB Atlas, create a free cluster, create a database user, whitelist your IP (or allow 0.0.0.0/0 for development).
+   * Create a database name `truck_management`.
+   * Copy connection string (replace `<password>` and db name)
+
+2. **Clone repo**
+
+```bash
+git clone <repo-url>
+cd truck-management-pwa
+npm install
+```
+
+3. **Create .env** (based on .env.example)
+
+```
+PORT=4000
+MONGODB_URI=mongodb+srv://user:password@cluster0.mongodb.net/truck_management?retryWrites=true&w=majority
+JWT_SECRET=someverysecuresecret
+```
+
+4. **Run locally**
+
+```bash
+npm run dev  # or node server/index.js
+```
+
+5. **Access**
+
+* Open `http://localhost:4000` to load the PWA. In Chrome, open DevTools -> Application -> Manifest to test installability.
+
+---
+
+## 10. Deployment (quick notes)
+
+* Host backend on Render / Railway / Heroku (or an EC2 instance). Use the provided repo and deploy branch.
+* Configure environment variables on the host (MONGODB_URI, JWT_SECRET).
+* Serve the `public/` static folder from Express or use a CDN (e.g., host static on Netlify and API on Render). If serving from different domains, configure CORS accordingly.
+* Ensure HTTPS is enabled (Render, Railway, Netlify provide HTTPS by default).
+
+---
+
+## 11. Developer checklist / next steps
+
+* [ ] Scaffold repo and install dependencies (express, mongoose, dotenv, cors, express-validator, jsonwebtoken)
+* [ ] Create Mongoose models and basic CRUD routes for Trucks and Drivers
+* [ ] Implement reports API and batch sync endpoint
+* [ ] Build the PWA shell (index.html + manifest + service-worker.js)
+* [ ] Implement IndexedDB helper (`public/idb.js`) and client sync logic (`public/app.js`)
+* [ ] Add authentication & role-based access (driver vs manager)
+* [ ] Add export (CSV/Excel) for reports
+* [ ] Add tests for API endpoints
+
+---
+
+## 12. Minimal package.json scripts
+
+```
+{
+  "name": "truck-management-pwa",
+  "version": "0.1.0",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "nodemon server/index.js",
+    "seed": "node scripts/seed.js"
+  },
+  "dependencies": {
+    "express": "^4.x",
+    "mongoose": "^7.x",
+    "dotenv": "^16.x",
+    "cors": "^2.x",
+    "express-validator": "^6.x",
+    "jsonwebtoken": "^9.x"
+  },
+  "devDependencies": {
+    "nodemon": "^2.x"
+  }
+}
+```
+
+---
+
+## 13. FAQ / Notes
+
+* **Why MongoDB?** Flexible document schema maps well to DailyReport arrays (expenses), fast prototyping, and Atlas free tier is easy and cheap for early-stage apps.
+* **Why Vanilla JS?** Low complexity for small apps; you avoid React/Angular overhead and deliver a fast, small PWA that works on older phones.
+* **Scaling:** When the product matures, you can move heavy aggregation to background workers or use BI tools (Metabase) connecting to MongoDB or an ETL process.
+
+---
+
+If you want, I can also:
+
+* Generate an initial **repo scaffold** with the files above and basic working endpoints.
+* Produce the **service-worker.js** and **idb.js** helper ready to drop into the public folder.
+* Create example **Mongoose models** and API route templates.
+
+Tell me which of the three (scaffold, service-worker, models & routes) you want first and I will prepare the code.
