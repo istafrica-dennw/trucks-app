@@ -3,6 +3,10 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import Users from './pages/Users';
+import Trucks from './pages/Trucks';
+import Drivers from './pages/Drivers';
+import Journeys from './pages/Journeys';
+import Profile from './pages/Profile';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import './App.css';
 
@@ -61,6 +65,46 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute requireAdmin={true}>
             <Users />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/admin/trucks" 
+        element={
+          <ProtectedRoute requireAdmin={true}>
+            <Trucks />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/admin/drivers" 
+        element={
+          <ProtectedRoute requireAdmin={true}>
+            <Drivers />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/admin/journeys" 
+        element={
+          <ProtectedRoute requireAdmin={true}>
+            <Journeys />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/admin/profile" 
+        element={
+          <ProtectedRoute requireAdmin={true}>
+            <Profile />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/profile" 
+        element={
+          <ProtectedRoute>
+            <Profile />
           </ProtectedRoute>
         } 
       />

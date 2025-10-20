@@ -1,3 +1,4 @@
+  const API_BASE = `http://${window.location.hostname}:5001`;
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import Sidebar from '../components/Sidebar';
@@ -10,6 +11,8 @@ const AdminDashboard = () => {
   const { user, token } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [userStats, setUserStats] = useState(null);
+  const [truckStats, setTruckStats] = useState(null);
+  const [driverStats, setDriverStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const toggleSidebar = () => {
@@ -23,7 +26,7 @@ const AdminDashboard = () => {
   // Fetch user statistics
   const fetchUserStats = async () => {
     try {
-      const response = await fetch('http://localhost:5001/api/users/stats', {
+      const response = await fetch(`${API_BASE}/api/users/stats`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -38,6 +41,48 @@ const AdminDashboard = () => {
       setUserStats(data.data);
     } catch (error) {
       console.error('Error fetching user stats:', error);
+    }
+  };
+
+  // Fetch truck statistics
+  const fetchTruckStats = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/trucks/stats`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch truck statistics');
+      }
+
+      const data = await response.json();
+      setTruckStats(data.data);
+    } catch (error) {
+      console.error('Error fetching truck stats:', error);
+    }
+  };
+
+  // Fetch driver statistics
+  const fetchDriverStats = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/drivers/stats`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch driver statistics');
+      }
+
+      const data = await response.json();
+      setDriverStats(data.data);
+    } catch (error) {
+      console.error('Error fetching driver stats:', error);
     } finally {
       setLoading(false);
     }
@@ -46,6 +91,8 @@ const AdminDashboard = () => {
   useEffect(() => {
     if (token) {
       fetchUserStats();
+      fetchTruckStats();
+      fetchDriverStats();
     }
   }, [token]);
 
@@ -53,8 +100,8 @@ const AdminDashboard = () => {
   const metrics = [
     {
       title: 'Total Trucks',
-      value: '24',
-      description: '+2 this month',
+      value: loading ? '...' : (truckStats ? truckStats.total.toString() : '0'),
+      description: truckStats ? `${truckStats.active} active, ${truckStats.maintenance} maintenance` : 'Loading...',
       color: 'blue',
       icon: (
         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -63,9 +110,9 @@ const AdminDashboard = () => {
       )
     },
     {
-      title: 'Active Drivers',
-      value: '18',
-      description: '3 on route',
+      title: 'Total Drivers',
+      value: loading ? '...' : (driverStats ? driverStats.total.toString() : '0'),
+      description: driverStats ? `${driverStats.active} active, ${driverStats.inactive} inactive` : 'Loading...',
       color: 'green',
       icon: (
         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">

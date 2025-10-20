@@ -1,37 +1,87 @@
 import mongoose from 'mongoose';
 
 const driveSchema = new mongoose.Schema({
-  truck: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Truck',
-    required: [true, 'Truck is required']
-  },
   driver: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Driver',
     required: [true, 'Driver is required']
   },
-  date: {
-    type: Date,
-    required: [true, 'Drive date is required'],
-    default: Date.now
+  truck: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Truck',
+    required: [true, 'Truck is required']
   },
-  startLocation: {
+  departureCity: {
     type: String,
-    required: [true, 'Start location is required'],
+    required: [true, 'Departure city is required'],
     trim: true
   },
-  endLocation: {
+  destinationCity: {
     type: String,
-    required: [true, 'End location is required'],
+    required: [true, 'Destination city is required'],
+    trim: true
+  },
+  cargo: {
+    type: String,
+    required: [true, 'Cargo is required'],
     trim: true
   },
   customer: {
     type: String,
+    required: [true, 'Customer is required'],
     trim: true
+  },
+  expenses: [{
+    title: {
+      type: String,
+      required: [true, 'Expense title is required'],
+      trim: true
+    },
+    amount: {
+      type: Number,
+      required: [true, 'Expense amount is required'],
+      min: [0, 'Expense amount cannot be negative']
+    },
+    note: {
+      type: String,
+      trim: true
+    }
+  }],
+  pay: {
+    totalAmount: {
+      type: Number,
+      required: [true, 'Total amount is required'],
+      min: [0, 'Total amount cannot be negative']
+    },
+    paidOption: {
+      type: String,
+      required: [true, 'Payment option is required'],
+      enum: ['full', 'installment']
+    },
+    installments: [{
+      amount: {
+        type: Number,
+        required: true,
+        min: [0, 'Installment amount cannot be negative']
+      },
+      date: {
+        type: Date,
+        required: true,
+        default: Date.now
+      },
+      note: {
+        type: String,
+        trim: true
+      }
+    }]
+  },
+  balance: {
+    type: Number,
+    default: 0
   },
   notes: {
     type: String,
+    trim: true,
     maxlength: [500, 'Notes cannot exceed 500 characters']
   },
   status: {
@@ -39,55 +89,20 @@ const driveSchema = new mongoose.Schema({
     enum: ['started', 'completed'],
     default: 'started'
   },
-  // Financial information
-  revenue: {
-    type: Number,
-    min: [0, 'Revenue cannot be negative']
+  date: {
+    type: Date,
+    required: [true, 'Journey date is required'],
+    default: Date.now
   },
-  expenses: [{
-    type: {
-      type: String,
-      required: true,
-      enum: ['fuel', 'toll', 'maintenance', 'other']
-    },
-    amount: {
-      type: Number,
-      required: true,
-      min: [0, 'Expense amount cannot be negative']
-    },
-    description: {
-      type: String,
-      trim: true
-    },
-    date: {
-      type: Date,
-      default: Date.now
-    }
-  }],
-  // Optional operational data
-  distance: {
-    type: Number,
-    min: [0, 'Distance cannot be negative']
-  },
-  fuelConsumption: {
-    type: Number,
-    min: [0, 'Fuel consumption cannot be negative']
-  },
-  loadWeight: {
-    type: Number,
-    min: [0, 'Load weight cannot be negative']
-  },
-  // Time tracking
-  startTime: Date,
-  endTime: Date,
-  // Created by user
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
   }
 }, {
-  timestamps: true
+  timestamps: true,
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
 });
 
 // Indexes for better performance
@@ -96,19 +111,12 @@ driveSchema.index({ driver: 1 });
 driveSchema.index({ date: -1 });
 driveSchema.index({ status: 1 });
 driveSchema.index({ createdBy: 1 });
+driveSchema.index({ customer: 1 });
+driveSchema.index({ departureCity: 1 });
+driveSchema.index({ destinationCity: 1 });
+driveSchema.index({ 'pay.paidOption': 1 });
 driveSchema.index({ date: -1, truck: 1 });
 driveSchema.index({ date: -1, driver: 1 });
-
-// Virtual for duration
-driveSchema.virtual('duration').get(function() {
-  if (!this.startTime || !this.endTime) return null;
-  
-  const duration = this.endTime - this.startTime;
-  const hours = Math.floor(duration / (1000 * 60 * 60));
-  const minutes = Math.floor((duration % (1000 * 60 * 60)) / (1000 * 60));
-  
-  return `${hours}h ${minutes}m`;
-});
 
 // Virtual for total expenses
 driveSchema.virtual('totalExpenses').get(function() {
@@ -117,36 +125,52 @@ driveSchema.virtual('totalExpenses').get(function() {
   return this.expenses.reduce((total, expense) => total + expense.amount, 0);
 });
 
-// Virtual for net profit
-driveSchema.virtual('netProfit').get(function() {
-  const revenue = this.revenue || 0;
-  const expenses = this.totalExpenses || 0;
-  return revenue - expenses;
-});
-
-// Virtual for fuel efficiency
-driveSchema.virtual('fuelEfficiency').get(function() {
-  if (!this.distance || !this.fuelConsumption || this.fuelConsumption === 0) return null;
+// Virtual for total paid amount
+driveSchema.virtual('totalPaid').get(function() {
+  if (this.pay.paidOption === 'full') {
+    return this.pay.totalAmount;
+  }
   
-  return (this.distance / this.fuelConsumption).toFixed(2);
+  if (!this.pay.installments || this.pay.installments.length === 0) return 0;
+  
+  return this.pay.installments.reduce((total, installment) => total + installment.amount, 0);
 });
 
-// Pre-save middleware to validate dates
+// Virtual for balance (total paid - total expenses)
+driveSchema.virtual('calculatedBalance').get(function() {
+  const totalPaid = this.totalPaid || 0;
+  const totalExpenses = this.totalExpenses || 0;
+  return totalPaid - totalExpenses;
+});
+
+// Virtual for is fully paid
+driveSchema.virtual('isFullyPaid').get(function() {
+  const totalPaid = this.totalPaid || 0;
+  return totalPaid >= this.pay.totalAmount;
+});
+
+// Pre-save middleware to validate payment and calculate balance
 driveSchema.pre('save', function(next) {
-  // Validate that end time is after start time
-  if (this.startTime && this.endTime && this.endTime <= this.startTime) {
-    return next(new Error('End time must be after start time'));
+  // Validate that journey date is not in the future
+  if (this.date > new Date()) {
+    return next(new Error('Journey date cannot be in the future'));
   }
   
-  // Validate that drive date is not in the future
-  if (this.date > new Date()) {
-    return next(new Error('Drive date cannot be in the future'));
+  // Validate installment payments don't exceed total amount
+  if (this.pay.paidOption === 'installment') {
+    const totalInstallments = this.pay.installments.reduce((total, installment) => total + installment.amount, 0);
+    if (totalInstallments > this.pay.totalAmount) {
+      return next(new Error('Total installments cannot exceed total amount'));
+    }
   }
+  
+  // Calculate and update balance
+  this.balance = this.calculatedBalance;
   
   next();
 });
 
-// Static method to find drives by date range
+// Static method to find journeys by date range
 driveSchema.statics.findByDateRange = function(startDate, endDate) {
   return this.find({
     date: {
@@ -156,7 +180,7 @@ driveSchema.statics.findByDateRange = function(startDate, endDate) {
   }).populate('truck driver createdBy');
 };
 
-// Static method to find drives by truck
+// Static method to find journeys by truck
 driveSchema.statics.findByTruck = function(truckId, limit = 50) {
   return this.find({ truck: truckId })
     .sort({ date: -1 })
@@ -164,7 +188,7 @@ driveSchema.statics.findByTruck = function(truckId, limit = 50) {
     .populate('truck driver createdBy');
 };
 
-// Static method to find drives by driver
+// Static method to find journeys by driver
 driveSchema.statics.findByDriver = function(driverId, limit = 50) {
   return this.find({ driver: driverId })
     .sort({ date: -1 })
@@ -172,7 +196,15 @@ driveSchema.statics.findByDriver = function(driverId, limit = 50) {
     .populate('truck driver createdBy');
 };
 
-// Static method to get drive statistics
+// Static method to find journeys by customer
+driveSchema.statics.findByCustomer = function(customer, limit = 50) {
+  return this.find({ customer: { $regex: customer, $options: 'i' } })
+    .sort({ date: -1 })
+    .limit(limit)
+    .populate('truck driver createdBy');
+};
+
+// Static method to get journey statistics
 driveSchema.statics.getStatistics = function(startDate, endDate) {
   return this.aggregate([
     {
@@ -186,13 +218,14 @@ driveSchema.statics.getStatistics = function(startDate, endDate) {
     {
       $group: {
         _id: null,
-        totalDrives: { $sum: 1 },
-        totalRevenue: { $sum: '$revenue' },
+        totalJourneys: { $sum: 1 },
+        totalAmount: { $sum: '$pay.totalAmount' },
         totalExpenses: { $sum: { $sum: '$expenses.amount' } },
-        totalDistance: { $sum: '$distance' },
-        totalFuelConsumption: { $sum: '$fuelConsumption' },
-        averageRevenue: { $avg: '$revenue' },
-        averageDistance: { $avg: '$distance' }
+        totalPaid: { $sum: { $sum: '$pay.installments.amount' } },
+        averageAmount: { $avg: '$pay.totalAmount' },
+        completedJourneys: {
+          $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] }
+        }
       }
     }
   ]);
@@ -204,21 +237,27 @@ driveSchema.methods.addExpense = function(expense) {
   return this.save();
 };
 
-// Instance method to complete drive
-driveSchema.methods.completeDrive = function(endTime) {
-  this.status = 'completed';
-  this.endTime = endTime || new Date();
+// Instance method to add installment
+driveSchema.methods.addInstallment = function(installment) {
+  if (this.pay.paidOption !== 'installment') {
+    throw new Error('Cannot add installment to non-installment payment');
+  }
+  
+  const currentTotal = this.pay.installments.reduce((total, inst) => total + inst.amount, 0);
+  if (currentTotal + installment.amount > this.pay.totalAmount) {
+    throw new Error('Installment would exceed total amount');
+  }
+  
+  this.pay.installments.push(installment);
   return this.save();
 };
 
-// Transform output
-driveSchema.methods.toJSON = function() {
-  const driveObject = this.toObject();
-  driveObject.duration = this.duration;
-  driveObject.totalExpenses = this.totalExpenses;
-  driveObject.netProfit = this.netProfit;
-  driveObject.fuelEfficiency = this.fuelEfficiency;
-  return driveObject;
+// Instance method to complete journey
+driveSchema.methods.completeJourney = function() {
+  this.status = 'completed';
+  return this.save();
 };
+
+// Virtual fields are now automatically included via schema options
 
 export default mongoose.model('Drive', driveSchema);

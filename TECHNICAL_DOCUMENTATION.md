@@ -263,35 +263,42 @@ truck-management-pwa/
   email: String,           // Optional email address
   nationalId: String,      // National identification number
   licenseNumber: String,   // Driving license number
-  address: String,         // Home address
-  hireDate: Date,          // Date of employment
+  address: String,         // Home address 
+  hireDate: Date,          // Date of employment:optional
   status: String,          // active, inactive, suspended
   createdAt: Date,
   updatedAt: Date
 }
 ```
 
-#### Drive/TruckOperation Model
+#### Journey/Drive Model
 ```javascript
 {
+  driver: ObjectId,        // Reference to driver
   truck: ObjectId,         // Reference to truck
-  driver: ObjectId,        // Reference to driver (assigned when drive is created)
-  date: Date,              // Drive date (normalized to midnight)
-  startTime: Date,         // Drive start time
-  endTime: Date,           // Drive end time
-  product: String,         // Product transported
-  revenue: Number,         // Total revenue from this drive
+  departureCity: String,   // Departure city
+  destinationCity: String, // Destination city
+  cargo: String,           // Content transported
+  customer: String,        // Customer name
   expenses: [{             // Array of expenses
-    type: String,          // fuel, maintenance, toll, other
+    title: String,         // Expense title
     amount: Number,        // Expense amount
-    note: String,          // Expense description
-    receipt: String        // Receipt reference (optional)
+    note: String           // Expense note (optional)
   }],
-  startLocation: String,   // Starting location
-  endLocation: String,     // Ending location
-  customer: String,        // Optional: Customer/client name
-  notes: String,           // Additional notes
-  status: String,          // started, completed
+  pay: {                   // Payment information
+    totalAmount: Number,   // Total amount to be paid
+    paidOption: String,    // "full" or "installment"
+    installments: [{       // Array of installments (if installment)
+      amount: Number,      // Installment amount
+      date: Date,          // Installment date
+      note: String         // Installment note (optional)
+    }]
+  },
+  balance: Number,         // Calculated: (total paid amount - total expenses)
+  notes: String,           // Additional notes (optional)
+  status: String,          // "started" or "completed"
+  date: Date,              // Journey date (normalized to midnight)
+  createdBy: ObjectId,     // User who created the journey
   createdAt: Date,
   updatedAt: Date
 }
@@ -370,21 +377,24 @@ DELETE /api/drivers/:id     # Delete driver
 GET    /api/drivers/:id/drives   # Get driver drives
 ```
 
-### Drive/TruckOperation Management Endpoints
+### Journey/Drive Management Endpoints
 ```
-GET    /api/drives          # List all drives (with filters)
-POST   /api/drives          # Create single drive record
-POST   /api/drives/batch    # Create multiple drives (sync)
-GET    /api/drives/:id      # Get specific drive details
-PUT    /api/drives/:id      # Update drive
-DELETE /api/drives/:id      # Delete drive
+GET    /api/drives                    # List all journeys (with filters)
+POST   /api/drives                    # Create single journey record
+POST   /api/drives/batch              # Create multiple journeys (sync)
+GET    /api/drives/:id                # Get specific journey details
+PUT    /api/drives/:id                # Update journey
+DELETE /api/drives/:id                # Delete journey
+POST   /api/drives/:id/installment    # Add installment payment
 ```
 
-### Drive Filtering Endpoints
+### Journey Filtering Endpoints
 ```
-GET    /api/drives/by-day/:date           # Get drives for specific day
-GET    /api/drives/by-customer/:customer  # Get drives for specific customer
-GET    /api/drives/date-range             # Get drives within date range
+GET    /api/drives/by-day/:date           # Get journeys for specific day
+GET    /api/drives/by-customer/:customer  # Get journeys for specific customer
+GET    /api/drives/by-truck/:truckId      # Get journeys for specific truck
+GET    /api/drives/by-driver/:driverId    # Get journeys for specific driver
+GET    /api/drives/date-range             # Get journeys within date range
 ```
 
 ### Reports and Statistics Endpoints
@@ -397,16 +407,19 @@ GET    /api/reports/summary               # Overall summary statistics
 GET    /api/reports/export                # Export reports (CSV/Excel)
 ```
 
-### Query Parameters for Drives
+### Query Parameters for Journeys
 - `truckId`: Filter by specific truck
 - `driverId`: Filter by specific driver
 - `startDate`: Start date for date range
 - `endDate`: End date for date range
-- `status`: Filter by drive status (draft, submitted, approved, completed)
+- `status`: Filter by journey status (started, completed)
 - `customer`: Filter by customer name
+- `departureCity`: Filter by departure city
+- `destinationCity`: Filter by destination city
+- `paidOption`: Filter by payment option (full, installment)
 - `limit`: Number of results to return
 - `offset`: Number of results to skip (for pagination)
-- `sortBy`: Sort field (date, income, pay, distance)
+- `sortBy`: Sort field (date, totalAmount, balance, customer)
 - `sortOrder`: Sort direction (asc, desc)
 
 ### Query Parameters for Reports
@@ -666,9 +679,9 @@ Content-Type: application/json
 }
 ```
 
-### Getting Drives
+### Getting Journeys
 
-#### 1. List All Drives
+#### 1. List All Journeys
 ```http
 GET /api/drives
 ```
@@ -678,18 +691,42 @@ GET /api/drives
   "drives": [
     {
       "id": "64f1a2b3c4d5e6f7g8h9i0j1",
-      "truck": "64f1a2b3c4d5e6f7g8h9i0j2",
       "driver": "64f1a2b3c4d5e6f7g8h9i0j3",
-      "date": "2024-01-15T00:00:00.000Z",
-      "startTime": "2024-01-15T08:00:00.000Z",
-      "endTime": "2024-01-15T17:30:00.000Z",
-      "product": "Construction Materials",
-      "revenue": 500.00,
+      "truck": "64f1a2b3c4d5e6f7g8h9i0j2",
+      "departureCity": "New York",
+      "destinationCity": "Boston",
+      "cargo": "Construction Materials",
       "customer": "ABC Construction",
-      "distance": 120,
-      "fuelConsumption": 25.5,
-      "loadWeight": 5000,
-      "status": "completed"
+      "expenses": [
+        {
+          "title": "Fuel",
+          "amount": 150.00,
+          "note": "Gas station refill"
+        },
+        {
+          "title": "Toll",
+          "amount": 25.00,
+          "note": "Highway tolls"
+        }
+      ],
+      "pay": {
+        "totalAmount": 800.00,
+        "paidOption": "installment",
+        "installments": [
+          {
+            "amount": 400.00,
+            "date": "2024-01-15T00:00:00.000Z",
+            "note": "First payment"
+          }
+        ]
+      },
+      "balance": 225.00,
+      "notes": "Delivered on time",
+      "status": "completed",
+      "date": "2024-01-15T00:00:00.000Z",
+      "totalExpenses": 175.00,
+      "totalPaid": 400.00,
+      "isFullyPaid": false
     }
   ],
   "total": 1,
@@ -698,27 +735,67 @@ GET /api/drives
 }
 ```
 
-#### 2. List Drives Per Day
+#### 2. Create New Journey
+```http
+POST /api/drives
+Content-Type: application/json
+Authorization: Bearer <token>
+
+{
+  "driver": "64f1a2b3c4d5e6f7g8h9i0j3",
+  "truck": "64f1a2b3c4d5e6f7g8h9i0j2",
+  "departureCity": "New York",
+  "destinationCity": "Boston",
+  "cargo": "Construction Materials",
+  "customer": "ABC Construction",
+  "expenses": [
+    {
+      "title": "Fuel",
+      "amount": 150.00,
+      "note": "Gas station refill"
+    }
+  ],
+  "pay": {
+    "totalAmount": 800.00,
+    "paidOption": "full"
+  },
+  "notes": "Priority delivery"
+}
+```
+
+#### 3. Add Installment Payment
+```http
+POST /api/drives/64f1a2b3c4d5e6f7g8h9i0j1/installment
+Content-Type: application/json
+Authorization: Bearer <token>
+
+{
+  "amount": 200.00,
+  "note": "Second installment"
+}
+```
+
+#### 4. List Journeys Per Day
 ```http
 GET /api/drives/by-day/2024-01-15
 ```
-**Response:** Array of drives for that specific day
+**Response:** Array of journeys for that specific day
 
-#### 3. List Drives Per Truck
+#### 5. List Journeys Per Truck
 ```http
-GET /api/trucks/64f1a2b3c4d5e6f7g8h9i0j2/drives
+GET /api/drives/by-truck/64f1a2b3c4d5e6f7g8h9i0j2
 ```
-**Response:** Array of all drives for that truck
+**Response:** Array of all journeys for that truck
 
-#### 4. List Drives Per Driver
+#### 6. List Journeys Per Driver
 ```http
-GET /api/drivers/64f1a2b3c4d5e6f7g8h9i0j3/drives
+GET /api/drives/by-driver/64f1a2b3c4d5e6f7g8h9i0j3
 ```
-**Response:** Array of all drives for that driver
+**Response:** Array of all journeys for that driver
 
-#### 5. List Drives with Filters
+#### 7. List Journeys with Filters
 ```http
-GET /api/drives?startDate=2024-01-01&endDate=2024-01-31&truckId=64f1a2b3c4d5e6f7g8h9i0j2&status=completed
+GET /api/drives?startDate=2024-01-01&endDate=2024-01-31&truckId=64f1a2b3c4d5e6f7g8h9i0j2&status=completed&paidOption=installment
 ```
 
 ### Getting Reports and Statistics

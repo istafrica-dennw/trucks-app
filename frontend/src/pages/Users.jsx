@@ -1,3 +1,4 @@
+  const API_BASE = `http://${window.location.hostname}:5001`;
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import Sidebar from '../components/Sidebar';
@@ -19,12 +20,39 @@ const Users = () => {
   });
   const [submitting, setSubmitting] = useState(false);
   const [updatingRoles, setUpdatingRoles] = useState({});
+  const [deletingUsers, setDeletingUsers] = useState({});
+  const [showUserDetails, setShowUserDetails] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [userToDelete, setUserToDelete] = useState(null);
+  const [pagination, setPagination] = useState({
+    current: 1,
+    pages: 1,
+    total: 0,
+    limit: 10
+  });
+  const [filters, setFilters] = useState({
+    role: '',
+    status: '',
+    search: ''
+  });
 
-  // Fetch users from API
-  const fetchUsers = async () => {
+  // Fetch users from API with pagination and filtering
+  const fetchUsers = async (page = 1, limit = 10, role = '', status = '', search = '') => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:5001/api/users', {
+      
+      // Build query parameters
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: limit.toString()
+      });
+      
+      if (role) params.append('role', role);
+      if (status) params.append('status', status);
+      if (search) params.append('search', search);
+
+      const response = await fetch(`${API_BASE}/api/users?${params}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -37,6 +65,12 @@ const Users = () => {
 
       const data = await response.json();
       setUsers(data.data || []);
+      setPagination(data.pagination || {
+        current: 1,
+        pages: 1,
+        total: 0,
+        limit: 10
+      });
     } catch (err) {
       setError(err.message);
       console.error('Error fetching users:', err);
@@ -47,15 +81,16 @@ const Users = () => {
 
   useEffect(() => {
     if (token) {
-      fetchUsers();
+      fetchUsers(pagination.current, pagination.limit, filters.role, filters.status, filters.search);
     }
-  }, [token]);
+  }, [token, pagination.current, filters]);
 
-  // Filter users based on search term
-  const filteredUsers = users.filter(user => 
-    user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.phone.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Handle search input change
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    setSearchTerm(value);
+    setFilters(prev => ({ ...prev, search: value }));
+  };
 
   // Get user initials for avatar
   const getUserInitials = (email) => {
@@ -138,7 +173,7 @@ const Users = () => {
     }
 
     try {
-      const response = await fetch('http://localhost:5001/api/users', {
+      const response = await fetch(`${API_BASE}/api/users`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -192,7 +227,7 @@ const Users = () => {
     setError(null);
 
     try {
-      const response = await fetch(`http://localhost:5001/api/users/${userId}`, {
+      const response = await fetch(`${API_BASE}/api/users/${userId}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -213,6 +248,84 @@ const Users = () => {
     } finally {
       setUpdatingRoles(prev => ({ ...prev, [userId]: false }));
     }
+  };
+
+  // Handle delete user click (show confirmation modal)
+  const handleDeleteUserClick = (userId, userEmail) => {
+    // Prevent admin from deleting themselves
+    if (userId === user?.id) {
+      setError('You cannot delete your own account');
+      return;
+    }
+
+    setUserToDelete({ id: userId, email: userEmail });
+    setShowDeleteModal(true);
+  };
+
+  // Handle delete user confirmation
+  const handleDeleteUserConfirm = async () => {
+    if (!userToDelete) return;
+
+    setDeletingUsers(prev => ({ ...prev, [userToDelete.id]: true }));
+    setError(null);
+
+    try {
+      const response = await fetch(`${API_BASE}/api/users/${userToDelete.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to delete user');
+      }
+
+      // Refresh users list
+      await fetchUsers();
+      setShowDeleteModal(false);
+      setUserToDelete(null);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDeletingUsers(prev => ({ ...prev, [userToDelete.id]: false }));
+    }
+  };
+
+  // Handle delete modal close
+  const handleDeleteModalClose = () => {
+    setShowDeleteModal(false);
+    setUserToDelete(null);
+  };
+
+  // Handle view user details
+  const handleViewUserDetails = async (userId) => {
+    try {
+      const response = await fetch(`${API_BASE}/api/users/${userId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch user details');
+      }
+
+      const data = await response.json();
+      setSelectedUser(data.data);
+      setShowUserDetails(true);
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  // Handle close user details modal
+  const handleCloseUserDetails = () => {
+    setShowUserDetails(false);
+    setSelectedUser(null);
   };
 
   // Handle menu toggle for mobile
@@ -254,9 +367,32 @@ const Users = () => {
                   type="text"
                   placeholder="Search users..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={handleSearchChange}
                   className="search-input"
                 />
+              </div>
+              
+              {/* Filter Dropdowns */}
+              <div className="filters-container">
+                <select
+                  value={filters.role}
+                  onChange={(e) => setFilters(prev => ({ ...prev, role: e.target.value }))}
+                  className="filter-select"
+                >
+                  <option value="">All Roles</option>
+                  <option value="admin">Admin</option>
+                  <option value="user">User</option>
+                </select>
+                
+                <select
+                  value={filters.status}
+                  onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
+                  className="filter-select"
+                >
+                  <option value="">All Status</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
               </div>
               
               <button className="add-user-btn-new" onClick={handleAddUserClick}>
@@ -281,12 +417,12 @@ const Users = () => {
 
           {/* Users Grid */}
           <div className="users-grid">
-            {filteredUsers.length === 0 ? (
+            {users.length === 0 ? (
               <div className="no-users">
                 <p>No users found</p>
               </div>
             ) : (
-              filteredUsers.map((userData) => (
+              users.map((userData) => (
                 <div key={userData._id} className={`user-card ${userData._id === user?.id ? 'current-user' : ''}`}>
                   <div className="user-avatar">
                     {getUserInitials(userData.email)}
@@ -326,11 +462,64 @@ const Users = () => {
                         {formatLastLogin(userData.lastLogin)}
                       </span>
                     </div>
+                    
+                    <div className="user-actions">
+                      <button
+                        onClick={() => handleViewUserDetails(userData._id)}
+                        className="view-details-btn"
+                        title="View user details"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M1 12S5 4 12 4S23 12 23 12S19 20 12 20S1 12 1 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
+                      
+                      <button
+                        onClick={() => handleDeleteUserClick(userData._id, userData.email)}
+                        disabled={deletingUsers[userData._id] || userData._id === user?.id}
+                        className="delete-user-btn"
+                        title={userData._id === user?.id ? "You cannot delete your own account" : "Delete user"}
+                      >
+                        {deletingUsers[userData._id] ? (
+                          <span>Deleting...</span>
+                        ) : (
+                          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M3 6H5H21M8 6V4C8 3.46957 8.21071 2.96086 8.58579 2.58579C8.96086 2.21071 9.46957 2 10 2H14C14.5304 2 15.0391 2.21071 15.4142 2.58579C15.7893 2.96086 16 3.46957 16 4V6M19 6V20C19 20.5304 18.7893 21.0391 18.4142 21.4142C18.0391 21.7893 17.5304 22 17 22H7C6.46957 22 5.96086 21.7893 5.58579 21.4142C5.21071 21.0391 5 20.5304 5 20V6H19Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))
             )}
           </div>
+          
+          {/* Pagination */}
+          {pagination.pages > 1 && (
+            <div className="pagination">
+              <button
+                onClick={() => setPagination(prev => ({ ...prev, current: prev.current - 1 }))}
+                disabled={pagination.current === 1}
+                className="pagination-btn"
+              >
+                Previous
+              </button>
+              
+              <div className="pagination-info">
+                Page {pagination.current} of {pagination.pages} ({pagination.total} total)
+              </div>
+              
+              <button
+                onClick={() => setPagination(prev => ({ ...prev, current: prev.current + 1 }))}
+                disabled={pagination.current === pagination.pages}
+                className="pagination-btn"
+              >
+                Next
+              </button>
+            </div>
+          )}
         </div>
       </main>
 
@@ -403,6 +592,150 @@ const Users = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* User Details Modal */}
+      {showUserDetails && selectedUser && (
+        <div className="modal-overlay" onClick={handleCloseUserDetails}>
+          <div className="modal-content user-details-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>User Details</h2>
+              <button className="modal-close" onClick={handleCloseUserDetails}>
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            </div>
+            
+            <div className="user-details-content">
+              <div className="user-details-avatar">
+                <div className="user-avatar-large">
+                  {getUserInitials(selectedUser.email)}
+                </div>
+                <h3>{getDisplayName(selectedUser.email)}</h3>
+                <p className="user-email-detail">{selectedUser.email}</p>
+              </div>
+              
+              <div className="user-details-info">
+                <div className="detail-row">
+                  <span className="detail-label">User ID:</span>
+                  <span className="detail-value">{selectedUser._id}</span>
+                </div>
+                
+                <div className="detail-row">
+                  <span className="detail-label">Phone:</span>
+                  <span className="detail-value">{selectedUser.phone || 'Not provided'}</span>
+                </div>
+                
+                <div className="detail-row">
+                  <span className="detail-label">Role:</span>
+                  <span className={`detail-value role-badge ${selectedUser.role}`}>
+                    {selectedUser.role}
+                  </span>
+                </div>
+                
+                <div className="detail-row">
+                  <span className="detail-label">Status:</span>
+                  <span className={`detail-value status-badge ${selectedUser.isActive ? 'active' : 'inactive'}`}>
+                    {selectedUser.isActive ? 'Active' : 'Inactive'}
+                  </span>
+                </div>
+                
+                <div className="detail-row">
+                  <span className="detail-label">Email Verified:</span>
+                  <span className={`detail-value status-badge ${selectedUser.emailVerified ? 'verified' : 'unverified'}`}>
+                    {selectedUser.emailVerified ? 'Verified' : 'Unverified'}
+                  </span>
+                </div>
+                
+                <div className="detail-row">
+                  <span className="detail-label">Default Admin:</span>
+                  <span className="detail-value">{selectedUser.isDefaultAdmin ? 'Yes' : 'No'}</span>
+                </div>
+                
+                <div className="detail-row">
+                  <span className="detail-label">Created:</span>
+                  <span className="detail-value">
+                    {new Date(selectedUser.createdAt).toLocaleDateString()} at {new Date(selectedUser.createdAt).toLocaleTimeString()}
+                  </span>
+                </div>
+                
+                <div className="detail-row">
+                  <span className="detail-label">Last Updated:</span>
+                  <span className="detail-value">
+                    {new Date(selectedUser.updatedAt).toLocaleDateString()} at {new Date(selectedUser.updatedAt).toLocaleTimeString()}
+                  </span>
+                </div>
+                
+                {selectedUser.lastLogin && (
+                  <div className="detail-row">
+                    <span className="detail-label">Last Login:</span>
+                    <span className="detail-value">
+                      {new Date(selectedUser.lastLogin).toLocaleDateString()} at {new Date(selectedUser.lastLogin).toLocaleTimeString()}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+            
+            <div className="modal-actions">
+              <button type="button" onClick={handleCloseUserDetails} className="btn-cancel">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && userToDelete && (
+        <div className="modal-overlay" onClick={handleDeleteModalClose}>
+          <div className="modal-content delete-confirmation-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Delete User</h2>
+              <button className="modal-close" onClick={handleDeleteModalClose}>
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            </div>
+            
+            <div className="delete-confirmation-content">
+              <div className="delete-warning-icon">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M12 9V13M12 17H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              
+              <h3>Are you sure you want to delete this user?</h3>
+              <p className="delete-user-info">
+                <strong>Email:</strong> {userToDelete.email}
+              </p>
+              <p className="delete-warning-text">
+                This action cannot be undone. The user will be permanently removed from the system.
+              </p>
+            </div>
+            
+            <div className="modal-actions">
+              <button 
+                type="button" 
+                onClick={handleDeleteModalClose} 
+                className="btn-cancel"
+                disabled={deletingUsers[userToDelete.id]}
+              >
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                onClick={handleDeleteUserConfirm} 
+                className="btn-delete"
+                disabled={deletingUsers[userToDelete.id]}
+              >
+                {deletingUsers[userToDelete.id] ? 'Deleting...' : 'Delete User'}
+              </button>
+            </div>
           </div>
         </div>
       )}

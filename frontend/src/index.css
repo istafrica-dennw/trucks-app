@@ -31,6 +31,32 @@ body {
   overflow-x: hidden;
 }
 
+/* Ensure readable input text on mobile (dark mode/iOS autofill) */
+input, select, textarea {
+  color: #111111;
+  background-color: #ffffff;
+  caret-color: #111111;
+}
+
+input::placeholder, textarea::placeholder {
+  color: #6b7280;
+}
+
+/* iOS Safari autofill fix */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+  -webkit-text-fill-color: #111111 !important;
+  transition: background-color 5000s ease-in-out 0s;
+  box-shadow: 0 0 0px 1000px #ffffff inset;
+}
+
 h1 {
   font-size: 3.2em;
   line-height: 1.1;

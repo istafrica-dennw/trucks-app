@@ -1147,6 +1147,362 @@ logger.error('Create user service error', {
 - 🧪 **Testing** - Feature is implemented but under testing
 - 🚀 **Deployed** - Feature is deployed to production
 
+## Truck Management API System
+
+### Overview
+Complete CRUD API system for truck management with comprehensive validation, business logic, and error handling.
+
+### Backend Implementation
+
+#### 1. Truck Validators (`backend/validators/truckValidators.js`)
+- **Joi Validation Schemas**:
+  - `truckId`: MongoDB ObjectId validation
+  - `getAllTrucks`: Pagination and filtering (status, make, search)
+  - `createTruck`: Complete truck creation validation
+  - `updateTruck`: Partial update validation with at least one field required
+- **Validation Features**:
+  - Plate number pattern validation (letters, numbers, hyphens, spaces)
+  - VIN validation (17 characters, alphanumeric)
+  - Year validation (1900 to current year + 1)
+  - Capacity validation (1 to 100,000)
+  - Fuel type enum validation (diesel, petrol, electric, hybrid)
+  - Status enum validation (active, maintenance, inactive)
+  - Date validations for service and insurance dates
+  - Comprehensive error messages for all validation rules
+
+#### 2. Truck Service (`backend/services/truckService.js`)
+- **Core Operations**:
+  - `getAllTrucks()`: Paginated listing with filtering and search
+  - `getTruckById()`: Single truck retrieval
+  - `createTruck()`: New truck creation with duplicate checking
+  - `updateTruck()`: Truck updates with conflict validation
+  - `deleteTruck()`: Safe deletion with drive association checking
+  - `getTruckDrives()`: Retrieve drives for specific truck
+- **Advanced Features**:
+  - `getTruckStats()`: Comprehensive statistics for dashboard
+  - `getTrucksByStatus()`: Filter trucks by status
+  - `getTrucksDueForService()`: Service maintenance tracking
+- **Business Logic**:
+  - Duplicate plate number prevention
+  - Duplicate VIN prevention
+  - Drive association validation before deletion
+  - Comprehensive logging for all operations
+  - Error handling with specific error messages
+
+#### 3. Truck Controller (`backend/controllers/truckController.js`)
+- **HTTP Endpoints**:
+  - `GET /api/trucks`: List all trucks with pagination
+  - `GET /api/trucks/stats`: Truck statistics
+  - `GET /api/trucks/status/:status`: Trucks by status
+  - `GET /api/trucks/due-for-service`: Service due trucks
+  - `GET /api/trucks/:id`: Get specific truck
+  - `POST /api/trucks`: Create new truck
+  - `PUT /api/trucks/:id`: Update truck
+  - `DELETE /api/trucks/:id`: Delete truck
+  - `GET /api/trucks/:id/drives`: Get truck drives
+- **Response Handling**:
+  - Consistent JSON response format
+  - Proper HTTP status codes
+  - Detailed error messages
+  - Pagination metadata
+  - Success/error logging
+
+#### 4. Truck Routes (`backend/routes/trucks.js`)
+- **Security**: All routes protected with JWT authentication
+- **Authorization**: Admin-only access for all operations
+- **Validation**: Joi validation middleware for all inputs
+- **Route Organization**: RESTful API design with proper HTTP methods
+
+### API Features
+
+#### 1. Truck Statistics Endpoint
+```json
+{
+  "success": true,
+  "data": {
+    "total": 2,
+    "active": 2,
+    "maintenance": 0,
+    "inactive": 0,
+    "dueForService": 0,
+    "topMakes": [
+      {"_id": "Ford", "count": 1},
+      {"_id": "Chevrolet", "count": 1}
+    ]
+  }
+}
+```
+
+#### 2. Truck Creation
+```json
+{
+  "plateNumber": "ABC-123",
+  "make": "Ford",
+  "model": "F-150",
+  "year": 2020,
+  "capacity": 5000,
+  "fuelType": "diesel",
+  "status": "active",
+  "color": "White",
+  "mileage": 25000,
+  "notes": "Regular maintenance completed"
+}
+```
+
+#### 3. Pagination and Filtering
+- **Pagination**: `?page=1&limit=10`
+- **Status Filter**: `?status=active`
+- **Make Filter**: `?make=Ford`
+- **Search**: `?search=ABC-123` (searches plate, make, model, VIN)
+
+#### 4. Error Handling
+- **Duplicate Plate**: "Truck with this plate number already exists"
+- **Duplicate VIN**: "Truck with this VIN already exists"
+- **Not Found**: "Truck not found"
+- **Validation Errors**: Detailed field-specific error messages
+- **Drive Association**: "Cannot delete truck. It has X associated drive(s)"
+
+### Database Integration
+
+#### 1. Truck Model Features
+- **Comprehensive Fields**: 15+ fields including optional VIN, color, mileage
+- **Virtual Fields**: Age calculation, service status
+- **Indexes**: Optimized queries on plate, status, make, year
+- **Pre-save Middleware**: Automatic plate number formatting
+- **Static Methods**: `findByStatus()`, `findDueForService()`
+- **Instance Methods**: `updateServiceDates()`
+
+#### 2. Data Validation
+- **MongoDB Schema Validation**: Field types, required fields, enums
+- **Joi Validation**: Request-level validation with detailed messages
+- **Business Logic Validation**: Duplicate checking, relationship validation
+
+### Testing Results
+
+#### 1. API Endpoint Testing
+- ✅ **GET /api/trucks/stats**: Returns accurate statistics
+- ✅ **POST /api/trucks**: Creates trucks with validation
+- ✅ **GET /api/trucks**: Lists trucks with pagination
+- ✅ **GET /api/trucks/:id**: Retrieves specific truck
+- ✅ **PUT /api/trucks/:id**: Updates truck fields
+- ✅ **Search Functionality**: Filters by make, plate, model
+- ✅ **Error Handling**: Proper error responses for duplicates
+
+#### 2. Validation Testing
+- ✅ **Plate Number Validation**: Pattern matching and uniqueness
+- ✅ **Required Fields**: Proper validation for mandatory fields
+- ✅ **Data Types**: Number, string, date validation
+- ✅ **Enum Values**: Status and fuel type validation
+- ✅ **Date Ranges**: Service and insurance date validation
+
+#### 3. Business Logic Testing
+- ✅ **Duplicate Prevention**: Plate number and VIN uniqueness
+- ✅ **Relationship Validation**: Drive association checking
+- ✅ **Statistics Calculation**: Accurate counts and aggregations
+- ✅ **Search Functionality**: Multi-field search capability
+
+### Security Features
+- **JWT Authentication**: All endpoints require valid token
+- **Role-based Access**: Admin-only access to all operations
+- **Input Validation**: Comprehensive Joi validation
+- **Error Sanitization**: Safe error messages without sensitive data
+- **Audit Logging**: All operations logged with context
+
+### Performance Optimizations
+- **Database Indexes**: Optimized queries on frequently accessed fields
+- **Pagination**: Efficient data retrieval with limits
+- **Lean Queries**: Reduced memory usage with `.lean()`
+- **Aggregation Pipelines**: Efficient statistics calculation
+- **Selective Field Loading**: Only required fields in responses
+
+### File Structure
+```
+backend/
+├── models/Truck.js              # Mongoose schema with virtuals and methods
+├── validators/truckValidators.js # Joi validation schemas
+├── services/truckService.js     # Business logic layer
+├── controllers/truckController.js # HTTP request handling
+└── routes/trucks.js             # Route definitions with middleware
+```
+
+### Dependencies
+- **Mongoose**: Database operations and schema validation
+- **Joi**: Request validation and sanitization
+- **Express**: HTTP routing and middleware
+- **Winston**: Comprehensive logging
+
+### Integration Points
+- **User Management**: Admin-only access control
+- **Drive Management**: Truck-drive relationship validation
+- **Dashboard**: Statistics endpoint for metrics
+- **Authentication**: JWT-based security
+
+## Frontend Truck Management System
+
+### Overview
+Complete frontend implementation for truck management with comprehensive CRUD operations, modals, and dashboard integration.
+
+### Frontend Implementation
+
+#### 1. Trucks Page (`frontend/src/pages/Trucks.jsx`)
+- **Main Features**:
+  - **Truck Listing**: Grid layout with pagination and filtering
+  - **Search Functionality**: Real-time search across plate, make, model, VIN
+  - **Status Filtering**: Filter by active, maintenance, inactive
+  - **Make Filtering**: Filter by truck manufacturer
+  - **Responsive Design**: Mobile-first approach with responsive grid
+- **Truck Cards**:
+  - **Plate Number Display**: Prominent plate number with status badge
+  - **Truck Information**: Make/model, year, capacity, fuel type, color, mileage
+  - **Action Buttons**: View details, edit, delete with proper icons
+  - **Status Badges**: Color-coded status indicators (active, maintenance, inactive)
+- **Pagination**: Previous/Next navigation with page information
+- **Loading States**: Skeleton loading and spinner for better UX
+
+#### 2. Add Truck Modal
+- **Form Fields**:
+  - **Required Fields**: Plate number, make, model, year, capacity, fuel type, status
+  - **Optional Fields**: Color, mileage, VIN, notes, service dates, insurance/registration expiry
+  - **Validation**: Client-side validation with real-time feedback
+  - **Form Layout**: Two-column responsive grid layout
+- **Features**:
+  - **Auto-formatting**: Plate number uppercase conversion
+  - **Date Validation**: Service and insurance date validation
+  - **Error Handling**: Detailed error messages from backend
+  - **Loading States**: Submit button with loading indicator
+
+#### 3. Edit Truck Modal
+- **Pre-filled Data**: All existing truck data loaded and editable
+- **Same Validation**: Identical validation rules as add modal
+- **Update Functionality**: PUT request to update truck information
+- **Real-time Updates**: Immediate UI refresh after successful update
+
+#### 4. Truck Details Modal
+- **Comprehensive Display**:
+  - **Basic Information**: Make, model, year, capacity, fuel type
+  - **Additional Details**: Color, mileage, VIN, age, service status
+  - **Timestamps**: Created and last updated dates
+  - **Notes Section**: Formatted notes display
+- **Layout**: Two-column grid with organized sections
+- **Responsive**: Mobile-optimized layout
+
+#### 5. Delete Confirmation Modal
+- **Safety Features**:
+  - **Warning Icon**: Red circular warning icon
+  - **Truck Information**: Display plate number and make/model
+  - **Clear Warning**: "This action cannot be undone" message
+  - **Confirmation Required**: Two-step deletion process
+- **Loading States**: Delete button with loading indicator
+- **Error Handling**: Proper error display for deletion failures
+
+#### 6. Dashboard Integration
+- **Truck Statistics**: Real-time truck counts on admin dashboard
+- **Metrics Display**:
+  - **Total Trucks**: Real count from database
+  - **Status Breakdown**: Active, maintenance, inactive counts
+  - **Loading States**: Proper loading indicators
+- **API Integration**: Fetches from `/api/trucks/stats` endpoint
+
+### User Experience Features
+
+#### 1. Search and Filtering
+- **Real-time Search**: Debounced search with 500ms delay
+- **Multi-field Search**: Searches plate, make, model, VIN simultaneously
+- **Filter Combinations**: Status and make filters work together
+- **Clear Filters**: Easy filter reset functionality
+
+#### 2. Responsive Design
+- **Mobile-First**: Optimized for mobile devices
+- **Breakpoints**: 
+  - Mobile: Single column layout
+  - Tablet: Two-column grid
+  - Desktop: Multi-column grid with sidebar
+- **Touch-Friendly**: Large touch targets for mobile interaction
+
+#### 3. Loading and Error States
+- **Loading Indicators**: Spinners and skeleton loading
+- **Error Messages**: Clear, actionable error messages
+- **Empty States**: "No trucks found" with helpful messaging
+- **Network Handling**: Proper handling of network failures
+
+#### 4. Form Validation
+- **Client-side Validation**: Immediate feedback on form errors
+- **Server-side Integration**: Backend validation error display
+- **Required Field Indicators**: Clear marking of required fields
+- **Input Formatting**: Proper input types and constraints
+
+### Technical Implementation
+
+#### 1. State Management
+- **React Hooks**: useState and useEffect for state management
+- **API Integration**: Fetch API with proper error handling
+- **Loading States**: Comprehensive loading state management
+- **Error Handling**: Centralized error state management
+
+#### 2. API Integration
+- **RESTful Calls**: GET, POST, PUT, DELETE operations
+- **Authentication**: JWT token in Authorization header
+- **Error Handling**: Proper HTTP status code handling
+- **Response Processing**: JSON response parsing and validation
+
+#### 3. Component Architecture
+- **Modular Design**: Separate components for different functionalities
+- **Reusable Components**: Shared components like modals and forms
+- **Props Management**: Proper prop passing and validation
+- **Event Handling**: Comprehensive event handling for user interactions
+
+#### 4. CSS and Styling
+- **CSS Modules**: Scoped styling with Trucks.css
+- **Responsive Design**: Media queries for different screen sizes
+- **Consistent Design**: Matches existing app design system
+- **Accessibility**: Proper contrast ratios and focus states
+
+### File Structure
+```
+frontend/src/
+├── pages/
+│   ├── Trucks.jsx              # Main trucks page component
+│   └── Trucks.css              # Trucks page styles
+├── components/
+│   ├── Sidebar.jsx             # Updated with trucks navigation
+│   └── MobileHeader.jsx        # Mobile navigation
+├── pages/
+│   └── AdminDashboard.jsx      # Updated with truck statistics
+└── App.jsx                     # Updated with trucks route
+```
+
+### Navigation Integration
+- **Sidebar Navigation**: Trucks link in admin sidebar
+- **Route Protection**: Admin-only access to trucks page
+- **Active State**: Proper active state highlighting
+- **Mobile Navigation**: Mobile-friendly navigation integration
+
+### API Endpoints Used
+- `GET /api/trucks` - List trucks with pagination and filtering
+- `GET /api/trucks/stats` - Truck statistics for dashboard
+- `GET /api/trucks/:id` - Get specific truck details
+- `POST /api/trucks` - Create new truck
+- `PUT /api/trucks/:id` - Update truck
+- `DELETE /api/trucks/:id` - Delete truck
+
+### Error Handling
+- **Network Errors**: Proper handling of network failures
+- **Validation Errors**: Display of backend validation messages
+- **Permission Errors**: Handling of unauthorized access
+- **Not Found Errors**: Proper 404 error handling
+
+### Performance Optimizations
+- **Debounced Search**: Prevents excessive API calls
+- **Pagination**: Efficient data loading with limits
+- **Loading States**: Better perceived performance
+- **Error Boundaries**: Graceful error handling
+
+### Security Features
+- **Authentication**: JWT token validation
+- **Authorization**: Admin-only access control
+- **Input Sanitization**: Client-side input validation
+- **XSS Prevention**: Proper data handling and display
+
 ## Notes
 - Each feature should include implementation details, testing status, and deployment notes
 - Update status as features progress through development lifecycle

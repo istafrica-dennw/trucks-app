@@ -14,6 +14,7 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(null);
+  const API_BASE = `http://${window.location.hostname}:5001`;
 
   // Initialize auth state from localStorage
   useEffect(() => {
@@ -24,7 +25,7 @@ export const AuthProvider = ({ children }) => {
 
         if (storedToken && storedUser) {
           // Verify token is still valid by fetching user profile
-          const response = await fetch('http://localhost:5001/api/auth/profile', {
+          const response = await fetch(`${API_BASE}/api/auth/profile`, {
             headers: {
               'Authorization': `Bearer ${storedToken}`,
               'Content-Type': 'application/json',
@@ -58,7 +59,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (loginData) => {
     try {
-      const response = await fetch('http://localhost:5001/api/auth/login', {
+      const response = await fetch(`${API_BASE}/api/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -87,7 +88,7 @@ export const AuthProvider = ({ children }) => {
     try {
       // Call logout endpoint if token exists
       if (token) {
-        await fetch('http://localhost:5001/api/auth/logout', {
+        await fetch(`${API_BASE}/api/auth/logout`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -112,6 +113,32 @@ export const AuthProvider = ({ children }) => {
     localStorage.setItem('user', JSON.stringify(updatedUser));
   };
 
+  const updateProfile = async (profileData) => {
+    try {
+      const response = await fetch(`${API_BASE}/api/auth/profile`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(profileData),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setUser(data.user);
+        localStorage.setItem('user', JSON.stringify(data.user));
+        return { success: true, user: data.user };
+      } else {
+        return { success: false, message: data.message };
+      }
+    } catch (error) {
+      console.error('Profile update error:', error);
+      return { success: false, message: 'Network error. Please check your connection.' };
+    }
+  };
+
   const isAuthenticated = () => {
     return !!user && !!token;
   };
@@ -127,6 +154,7 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     updateUser,
+    updateProfile,
     isAuthenticated,
     isAdmin,
   };
