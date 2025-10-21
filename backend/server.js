@@ -15,6 +15,7 @@ import userRoutes from './routes/users.js';
 import truckRoutes from './routes/trucks.js';
 import driverRoutes from './routes/drivers.js';
 import driveRoutes from './routes/drives.js';
+import reportRoutes from './routes/reports.js';
 import testRoutes from './routes/test.js';
 
 // Import middleware
@@ -87,6 +88,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/trucks', truckRoutes);
 app.use('/api/drivers', driverRoutes);
 app.use('/api/drives', driveRoutes);
+app.use('/api/reports', reportRoutes);
 app.use('/test', testRoutes);
 
 // Error handling middleware (must be last)

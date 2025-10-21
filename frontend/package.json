@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite --host",
     "build": "vite build",
+    "start": "vite preview --host",
+    "prod": "vite preview --host --port 3000",
     "lint": "eslint .",
     "preview": "vite preview"
   },

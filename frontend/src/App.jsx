@@ -6,6 +6,7 @@ import Users from './pages/Users';
 import Trucks from './pages/Trucks';
 import Drivers from './pages/Drivers';
 import Journeys from './pages/Journeys';
+import Reports from './pages/Reports';
 import Profile from './pages/Profile';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import './App.css';
@@ -89,6 +90,14 @@ const AppRoutes = () => {
         element={
           <ProtectedRoute requireAdmin={true}>
             <Journeys />
+          </ProtectedRoute>
+        } 
+      />
+      <Route 
+        path="/admin/reports" 
+        element={
+          <ProtectedRoute requireAdmin={true}>
+            <Reports />
           </ProtectedRoute>
         } 
       />
