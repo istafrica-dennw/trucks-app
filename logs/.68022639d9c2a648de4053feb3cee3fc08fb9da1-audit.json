@@ -1,0 +1,15 @@
+{
+    "keep": {
+        "days": true,
+        "amount": 7
+    },
+    "auditLog": "/Users/denisniwemugisha/personal/apps/trucks-app/logs/.68022639d9c2a648de4053feb3cee3fc08fb9da1-audit.json",
+    "files": [
+        {
+            "date": 1761647381000,
+            "name": "/Users/denisniwemugisha/personal/apps/trucks-app/logs/debug-2025-10-28.log",
+            "hash": "0e641dac15a6f3bad73a9fd0b0377180bd164137ca994b36aeb78612d555f048"
+        }
+    ],
+    "hashType": "sha256"
+}

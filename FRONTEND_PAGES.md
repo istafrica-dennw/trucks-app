@@ -343,7 +343,6 @@ This document outlines all frontend pages for the Truck Management System, focus
 - Filter options
 - Responsive charts
 - Export options
-- Share functionality
 
 **User Journey**:
 1. Admin navigates to Reports section
