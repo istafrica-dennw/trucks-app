@@ -54,11 +54,7 @@ const driverSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Indexes for better performance
-driverSchema.index({ phone: 1 });
-driverSchema.index({ email: 1 });
-driverSchema.index({ licenseNumber: 1 });
-driverSchema.index({ nationalId: 1 });
+// Indexes for better performance (phone, email, licenseNumber, nationalId already have unique indexes)
 driverSchema.index({ status: 1 });
 driverSchema.index({ fullName: 1 });
 

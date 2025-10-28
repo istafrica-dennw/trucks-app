@@ -51,9 +51,7 @@ const userSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Indexes for better performance
-userSchema.index({ email: 1 });
-userSchema.index({ phone: 1 });
+// Indexes for better performance (email and phone already have unique indexes)
 userSchema.index({ role: 1 });
 userSchema.index({ isActive: 1 });
 

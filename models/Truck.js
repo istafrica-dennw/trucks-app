@@ -67,8 +67,7 @@ const truckSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Indexes for better performance
-truckSchema.index({ plateNumber: 1 });
+// Indexes for better performance (plateNumber already has unique index)
 truckSchema.index({ status: 1 });
 truckSchema.index({ make: 1, model: 1 });
 truckSchema.index({ year: 1 });
