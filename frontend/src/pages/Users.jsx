@@ -1,6 +1,6 @@
-  const API_BASE = `http://${window.location.hostname}:5001`;
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { createApiUrl, createAuthHeaders } from '../utils/apiConfig';
 import Sidebar from '../components/Sidebar';
 import MobileHeader from '../components/MobileHeader';
 import './Users.css';
@@ -52,11 +52,8 @@ const Users = () => {
       if (status) params.append('status', status);
       if (search) params.append('search', search);
 
-      const response = await fetch(`${API_BASE}/api/users?${params}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+      const response = await fetch(createApiUrl(`api/users?${params}`), {
+        headers: createAuthHeaders(token)
       });
 
       if (!response.ok) {
@@ -173,12 +170,9 @@ const Users = () => {
     }
 
     try {
-      const response = await fetch(`${API_BASE}/api/users`, {
+      const response = await fetch(createApiUrl('api/users'), {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
+        headers: createAuthHeaders(token),
         body: JSON.stringify(newUser)
       });
 
@@ -227,12 +221,9 @@ const Users = () => {
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE}/api/users/${userId}`, {
+      const response = await fetch(createApiUrl(`api/users/${userId}`), {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
+        headers: createAuthHeaders(token),
         body: JSON.stringify({ role: newRole })
       });
 
@@ -270,12 +261,9 @@ const Users = () => {
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE}/api/users/${userToDelete.id}`, {
+      const response = await fetch(createApiUrl(`api/users/${userToDelete.id}`), {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+        headers: createAuthHeaders(token)
       });
 
       if (!response.ok) {
@@ -303,11 +291,8 @@ const Users = () => {
   // Handle view user details
   const handleViewUserDetails = async (userId) => {
     try {
-      const response = await fetch(`${API_BASE}/api/users/${userId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+      const response = await fetch(createApiUrl(`api/users/${userId}`), {
+        headers: createAuthHeaders(token)
       });
 
       if (!response.ok) {

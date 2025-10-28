@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { createApiUrl, createAuthHeaders } from '../utils/apiConfig';
 import Sidebar from '../components/Sidebar';
 import MobileHeader from '../components/MobileHeader';
 import './Journeys.css';
 
 const Journeys = () => {
   const { token, user } = useAuth();
-  const API_BASE = `http://${window.location.hostname}:5001`;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [journeys, setJourneys] = useState([]);
   const [drivers, setDrivers] = useState([]);
@@ -62,12 +62,9 @@ const Journeys = () => {
   const handleMarkCompleted = async (journey) => {
     try {
       setCompletingJourneys(prev => ({ ...prev, [journey._id]: true }));
-      const response = await fetch(`${API_BASE}/api/drives/${journey._id}`, {
+      const response = await fetch(createApiUrl(`api/drives/${journey._id}`), {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
+        headers: createAuthHeaders(token),
         body: JSON.stringify({ status: 'completed' })
       });
 
@@ -182,11 +179,8 @@ const Journeys = () => {
         sortOrder
       });
 
-      const response = await fetch(`${API_BASE}/api/drives?${queryParams}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+      const response = await fetch(createApiUrl(`api/drives?${queryParams}`), {
+        headers: createAuthHeaders(token)
       });
 
       if (!response.ok) {
@@ -208,20 +202,14 @@ const Journeys = () => {
   // Fetch drivers and trucks for dropdowns
   const fetchDriversAndTrucks = async () => {
     try {
-      const [driversResponse, trucksResponse] = await Promise.all([
-        fetch(`${API_BASE}/api/drivers`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }),
-        fetch(`${API_BASE}/api/trucks`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        })
-      ]);
+        const [driversResponse, trucksResponse] = await Promise.all([
+          fetch(createApiUrl('api/drivers'), {
+            headers: createAuthHeaders(token)
+          }),
+          fetch(createApiUrl('api/trucks'), {
+            headers: createAuthHeaders(token)
+          })
+        ]);
 
       if (driversResponse.ok) {
         const driversData = await driversResponse.json();
@@ -240,11 +228,8 @@ const Journeys = () => {
   // Fetch journey details
   const fetchJourneyDetails = async (journeyId) => {
     try {
-      const response = await fetch(`${API_BASE}/api/drives/${journeyId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+      const response = await fetch(createApiUrl(`api/drives/${journeyId}`), {
+        headers: createAuthHeaders(token)
       });
 
       if (!response.ok) {
@@ -353,12 +338,9 @@ const Journeys = () => {
     try {
       setDeletingJourneys(prev => ({ ...prev, [journeyToDelete._id]: true }));
       
-      const response = await fetch(`${API_BASE}/api/drives/${journeyToDelete._id}`, {
+      const response = await fetch(createApiUrl(`api/drives/${journeyToDelete._id}`), {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+        headers: createAuthHeaders(token)
       });
 
       if (!response.ok) {
@@ -501,12 +483,9 @@ const Journeys = () => {
         }))
       };
 
-      const response = await fetch(`${API_BASE}/api/drives`, {
+      const response = await fetch(createApiUrl('api/drives'), {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
+        headers: createAuthHeaders(token),
         body: JSON.stringify(journeyData)
       });
 
@@ -593,12 +572,9 @@ const Journeys = () => {
         }
       };
 
-      const response = await fetch(`${API_BASE}/api/drives/${selectedJourney._id}`, {
+      const response = await fetch(createApiUrl(`api/drives/${selectedJourney._id}`), {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
+        headers: createAuthHeaders(token),
         body: JSON.stringify(journeyData)
       });
 
@@ -647,12 +623,9 @@ const Journeys = () => {
         note: newInstallment.note
       };
 
-      const response = await fetch(`${API_BASE}/api/drives/${selectedJourney._id}/installment`, {
+      const response = await fetch(createApiUrl(`api/drives/${selectedJourney._id}/installment`), {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
+        headers: createAuthHeaders(token),
         body: JSON.stringify(installmentData)
       });
 

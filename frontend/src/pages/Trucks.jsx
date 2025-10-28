@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { createApiUrl, createAuthHeaders } from '../utils/apiConfig';
 import Sidebar from '../components/Sidebar';
 import MobileHeader from '../components/MobileHeader';
 import './Trucks.css';
 
 const Trucks = () => {
   const { user, token } = useAuth();
-  const API_BASE = `http://${window.location.hostname}:5001`;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [trucks, setTrucks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -61,11 +61,8 @@ const Trucks = () => {
         ...(searchFilters.make && { make: searchFilters.make })
       });
 
-      const response = await fetch(`${API_BASE}/api/trucks?${queryParams}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+      const response = await fetch(createApiUrl(`api/trucks?${queryParams}`), {
+        headers: createAuthHeaders(token)
       });
 
       if (!response.ok) {
@@ -86,11 +83,8 @@ const Trucks = () => {
   // Fetch truck details
   const fetchTruckDetails = async (truckId) => {
     try {
-      const response = await fetch(`${API_BASE}/api/trucks/${truckId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+      const response = await fetch(createApiUrl(`api/trucks/${truckId}`), {
+        headers: createAuthHeaders(token)
       });
 
       if (!response.ok) {
@@ -193,12 +187,9 @@ const Trucks = () => {
         throw new Error('Capacity must be greater than 0');
       }
 
-      const response = await fetch(`${API_BASE}/api/trucks`, {
+      const response = await fetch(createApiUrl('api/trucks'), {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
+        headers: createAuthHeaders(token),
         body: JSON.stringify(newTruck)
       });
 
@@ -272,12 +263,9 @@ const Trucks = () => {
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE}/api/trucks/${selectedTruck._id}`, {
+      const response = await fetch(createApiUrl(`api/trucks/${selectedTruck._id}`), {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
+        headers: createAuthHeaders(token),
         body: JSON.stringify(selectedTruck)
       });
 
@@ -344,12 +332,9 @@ const Trucks = () => {
     setError(null);
 
     try {
-      const response = await fetch(`${API_BASE}/api/trucks/${truckToDelete._id}`, {
+      const response = await fetch(createApiUrl(`api/trucks/${truckToDelete._id}`), {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+        headers: createAuthHeaders(token)
       });
 
       if (!response.ok) {

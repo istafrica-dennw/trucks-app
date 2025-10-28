@@ -1,6 +1,6 @@
-  const API_BASE = `http://${window.location.hostname}:5001`;
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { createApiUrl, createAuthHeaders } from '../utils/apiConfig';
 import Sidebar from '../components/Sidebar';
 import MobileHeader from '../components/MobileHeader';
 import MetricCard from '../components/MetricCard';
@@ -26,11 +26,8 @@ const AdminDashboard = () => {
   // Fetch user statistics
   const fetchUserStats = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/users/stats`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+      const response = await fetch(createApiUrl('api/users/stats'), {
+        headers: createAuthHeaders(token)
       });
 
       if (!response.ok) {
@@ -47,11 +44,8 @@ const AdminDashboard = () => {
   // Fetch truck statistics
   const fetchTruckStats = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/trucks/stats`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+      const response = await fetch(createApiUrl('api/trucks/stats'), {
+        headers: createAuthHeaders(token)
       });
 
       if (!response.ok) {
@@ -68,11 +62,8 @@ const AdminDashboard = () => {
   // Fetch driver statistics
   const fetchDriverStats = async () => {
     try {
-      const response = await fetch(`${API_BASE}/api/drivers/stats`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+      const response = await fetch(createApiUrl('api/drivers/stats'), {
+        headers: createAuthHeaders(token)
       });
 
       if (!response.ok) {

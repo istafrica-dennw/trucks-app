@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { createApiUrl, createAuthHeaders } from '../utils/apiConfig';
 import Sidebar from '../components/Sidebar';
 import MobileHeader from '../components/MobileHeader';
 import './Reports.css';
@@ -29,11 +30,8 @@ const Reports = () => {
   const fetchTrucks = async () => {
     if (!token) return; // Ensure token exists before fetching
     try {
-      const response = await fetch(`http://${window.location.hostname}:5001/api/trucks`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+      const response = await fetch(createApiUrl('api/trucks'), {
+        headers: createAuthHeaders(token)
       });
       const data = await response.json();
 
@@ -54,29 +52,26 @@ const Reports = () => {
     
     try {
       let url = '';
-      const headers = {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      };
+      const headers = createAuthHeaders(token);
 
       const truckParam = selectedTruck ? `?truckId=${selectedTruck}` : '';
       
       switch (reportType) {
         case 'daily':
-          url = `http://${window.location.hostname}:5001/api/reports/daily/${selectedDate}${truckParam}`;
+          url = createApiUrl(`api/reports/daily/${selectedDate}${truckParam}`);
           break;
         case 'weekly':
-          url = `http://${window.location.hostname}:5001/api/reports/weekly/${selectedWeek}${truckParam}`;
+          url = createApiUrl(`api/reports/weekly/${selectedWeek}${truckParam}`);
           break;
         case 'monthly':
-          url = `http://${window.location.hostname}:5001/api/reports/monthly/${selectedMonth}${truckParam}`;
+          url = createApiUrl(`api/reports/monthly/${selectedMonth}${truckParam}`);
           break;
         case 'custom':
-          const baseUrl = `http://${window.location.hostname}:5001/api/reports/custom?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&groupBy=${groupBy}`;
+          const baseUrl = createApiUrl(`api/reports/custom?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}&groupBy=${groupBy}`);
           url = selectedTruck ? `${baseUrl}&truckId=${selectedTruck}` : baseUrl;
           break;
         case 'summary':
-          url = `http://${window.location.hostname}:5001/api/reports/summary${truckParam}`;
+          url = createApiUrl(`api/reports/summary${truckParam}`);
           break;
         default:
           throw new Error('Invalid report type');

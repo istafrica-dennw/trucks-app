@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { createApiUrl, createAuthHeaders } from '../utils/apiConfig';
 import Sidebar from '../components/Sidebar';
 import MobileHeader from '../components/MobileHeader';
 import './Drivers.css';
 
 const Drivers = () => {
   const { token } = useAuth();
-  const API_BASE = `http://${window.location.hostname}:5001`;
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [drivers, setDrivers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -62,11 +62,8 @@ const Drivers = () => {
         sortOrder
       });
 
-      const response = await fetch(`${API_BASE}/api/drivers?${queryParams}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+      const response = await fetch(createApiUrl(`api/drivers?${queryParams}`), {
+        headers: createAuthHeaders(token)
       });
 
       if (!response.ok) {
@@ -88,11 +85,8 @@ const Drivers = () => {
   // Fetch driver details
   const fetchDriverDetails = async (driverId) => {
     try {
-      const response = await fetch(`${API_BASE}/api/drivers/${driverId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+      const response = await fetch(createApiUrl(`api/drivers/${driverId}`), {
+        headers: createAuthHeaders(token)
       });
 
       if (!response.ok) {
@@ -180,12 +174,9 @@ const Drivers = () => {
     try {
       setDeletingDrivers(prev => ({ ...prev, [driverToDelete._id]: true }));
       
-      const response = await fetch(`${API_BASE}/api/drivers/${driverToDelete._id}`, {
+      const response = await fetch(createApiUrl(`api/drivers/${driverToDelete._id}`), {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+        headers: createAuthHeaders(token)
       });
 
       if (!response.ok) {
@@ -233,12 +224,9 @@ const Drivers = () => {
     setFieldErrors({});
 
     try {
-      const response = await fetch(`${API_BASE}/api/drivers`, {
+      const response = await fetch(createApiUrl('api/drivers'), {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
+        headers: createAuthHeaders(token),
         body: JSON.stringify(newDriver)
       });
 
@@ -291,12 +279,9 @@ const Drivers = () => {
     setFieldErrors({});
 
     try {
-      const response = await fetch(`${API_BASE}/api/drivers/${selectedDriver._id}`, {
+      const response = await fetch(createApiUrl(`api/drivers/${selectedDriver._id}`), {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
+        headers: createAuthHeaders(token),
         body: JSON.stringify(selectedDriver)
       });
 

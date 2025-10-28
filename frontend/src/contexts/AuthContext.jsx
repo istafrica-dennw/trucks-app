@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { getApiBaseUrl, createApiUrl, createAuthHeaders } from '../utils/apiConfig';
 
 const AuthContext = createContext();
 
@@ -14,7 +15,6 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState(null);
-  const API_BASE = `http://${window.location.hostname}:5001`;
 
   // Initialize auth state from localStorage
   useEffect(() => {
@@ -25,11 +25,8 @@ export const AuthProvider = ({ children }) => {
 
         if (storedToken && storedUser) {
           // Verify token is still valid by fetching user profile
-          const response = await fetch(`${API_BASE}/api/auth/profile`, {
-            headers: {
-              'Authorization': `Bearer ${storedToken}`,
-              'Content-Type': 'application/json',
-            },
+          const response = await fetch(createApiUrl('api/auth/profile'), {
+            headers: createAuthHeaders(storedToken),
           });
 
           if (response.ok) {
@@ -59,7 +56,7 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (loginData) => {
     try {
-      const response = await fetch(`${API_BASE}/api/auth/login`, {
+      const response = await fetch(createApiUrl('api/auth/login'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -88,12 +85,9 @@ export const AuthProvider = ({ children }) => {
     try {
       // Call logout endpoint if token exists
       if (token) {
-        await fetch(`${API_BASE}/api/auth/logout`, {
+        await fetch(createApiUrl('api/auth/logout'), {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
+          headers: createAuthHeaders(token),
         });
       }
     } catch (error) {
@@ -115,12 +109,9 @@ export const AuthProvider = ({ children }) => {
 
   const updateProfile = async (profileData) => {
     try {
-      const response = await fetch(`${API_BASE}/api/auth/profile`, {
+      const response = await fetch(createApiUrl('api/auth/profile'), {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: createAuthHeaders(token),
         body: JSON.stringify(profileData),
       });
 
