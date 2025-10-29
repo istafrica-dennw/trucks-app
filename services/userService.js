@@ -30,8 +30,7 @@ class UserService {
       
       if (search) {
         query.$or = [
-          { email: { $regex: search, $options: 'i' } },
-          { phone: { $regex: search, $options: 'i' } }
+          { username: { $regex: search, $options: 'i' } }
         ];
       }
 
@@ -111,40 +110,29 @@ class UserService {
    */
   async createUser(userData) {
     try {
-      const { email, phone, password } = userData;
+      const { username, password } = userData;
       const role = 'user'; // Always default to 'user' role
 
       // Check for existing user
       const existingUser = await User.findOne({
-        $or: [
-          { email: email },
-          { phone: phone }
-        ]
+        username: username
       });
 
       if (existingUser) {
-        if (existingUser.email === email) {
-          throw new Error('Email already exists');
-        }
-        if (existingUser.phone === phone) {
-          throw new Error('Phone number already exists');
-        }
+        throw new Error('Username already exists');
       }
 
       // Create user
       const user = await User.create({
-        email,
-        phone,
+        username,
         password,
         role,
-        isActive: true,
-        emailVerified: false
+        isActive: true
       });
 
       logger.info('User created', {
         userId: user._id,
-        email: user.email,
-        phone: user.phone,
+        username: user.username,
         role: user.role
       });
 
@@ -170,37 +158,23 @@ class UserService {
    */
   async updateUser(userId, updateData) {
     try {
-      const { email, phone, role, isActive } = updateData;
+      const { username, role, isActive } = updateData;
 
-      // Check for duplicate email/phone
-      if (email || phone) {
-        const query = { _id: { $ne: userId } };
-        if (email && phone) {
-          query.$or = [{ email }, { phone }];
-        } else if (email) {
-          query.email = email;
-        } else if (phone) {
-          query.phone = phone;
-        }
+      // Check for duplicate username
+      if (username) {
+        const existingUser = await User.findOne({
+          username: username,
+          _id: { $ne: userId }
+        });
 
-        const existingUser = await User.findOne(query);
         if (existingUser) {
-          if (existingUser.email === email) {
-            throw new Error('Email already exists');
-          }
-          if (existingUser.phone === phone) {
-            throw new Error('Phone number already exists');
-          }
+          throw new Error('Username already exists');
         }
       }
 
       // Prepare update data
       const updateFields = {};
-      if (email) {
-        updateFields.email = email;
-        updateFields.emailVerified = false; // Reset email verification
-      }
-      if (phone) updateFields.phone = phone;
+      if (username) updateFields.username = username;
       if (role) updateFields.role = role;
       if (isActive !== undefined) updateFields.isActive = isActive;
 
@@ -216,8 +190,7 @@ class UserService {
 
       logger.info('User updated', {
         userId: user._id,
-        email: user.email,
-        phone: user.phone,
+        username: user.username,
         updatedFields: Object.keys(updateFields)
       });
 
@@ -255,16 +228,14 @@ class UserService {
 
       logger.info('User deleted', {
         userId: userId,
-        username: user.username,
-        email: user.email
+        username: user.username
       });
 
       return {
         message: 'User deleted successfully',
         deletedUser: {
           id: user._id,
-          username: user.username,
-          email: user.email
+          username: user.username
         }
       };
     } catch (error) {
@@ -287,16 +258,13 @@ class UserService {
       const activeUsers = await User.countDocuments({ isActive: true });
       const adminUsers = await User.countDocuments({ role: 'admin' });
       const regularUsers = await User.countDocuments({ role: 'user' });
-      const verifiedUsers = await User.countDocuments({ emailVerified: true });
 
       const stats = {
         total: totalUsers,
         active: activeUsers,
         inactive: totalUsers - activeUsers,
         admins: adminUsers,
-        users: regularUsers,
-        verified: verifiedUsers,
-        unverified: totalUsers - verifiedUsers
+        users: regularUsers
       };
 
       logger.info('User statistics retrieved', stats);

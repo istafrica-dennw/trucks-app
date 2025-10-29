@@ -19,8 +19,6 @@ class AuthController {
       logger.auth('User login successful', {
         userId: result.user.id,
         username: result.user.username,
-        email: result.user.email,
-        phone: result.user.phone,
         role: result.user.role,
         ip: clientIp
       });
@@ -93,17 +91,17 @@ class AuthController {
   async updateProfile(req, res) {
     try {
       const userId = req.user.id;
-      const { email, phone } = req.body;
+      const { username } = req.body;
       const clientIp = req.ip || req.connection.remoteAddress;
 
       // Call service
-      const updatedUser = await authService.updateUserProfile(userId, { email, phone });
+      const updatedUser = await authService.updateUserProfile(userId, { username });
 
       // Update IP in logs
       logger.auth('User profile updated', {
         userId: updatedUser.id,
         username: updatedUser.username,
-        updatedFields: Object.keys({ email, phone }).filter(key => req.body[key]),
+        updatedFields: Object.keys({ username }).filter(key => req.body[key]),
         ip: clientIp
       });
 

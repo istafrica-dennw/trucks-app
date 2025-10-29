@@ -20,9 +20,8 @@ import {
 
 const router = express.Router();
 
-// All routes are protected and admin-only
+// All routes are protected
 router.use(protect);
-router.use(authorize('admin'));
 
 // GET /api/drivers - List all drivers with pagination and filtering
 router.get('/', 
@@ -39,8 +38,9 @@ router.get('/status/:status',
   getDriversByStatusController
 );
 
-// POST /api/drivers - Create new driver
+// POST /api/drivers - Create new driver (admin only)
 router.post('/', 
+  authorize('admin'),
   validate(createDriver),
   createDriverController
 );
@@ -51,15 +51,17 @@ router.get('/:id',
   getDriverByIdController
 );
 
-// PUT /api/drivers/:id - Update driver
+// PUT /api/drivers/:id - Update driver (admin only)
 router.put('/:id', 
+  authorize('admin'),
   validateParams(driverId),
   validate(updateDriver),
   updateDriverController
 );
 
-// DELETE /api/drivers/:id - Delete driver
+// DELETE /api/drivers/:id - Delete driver (admin only)
 router.delete('/:id', 
+  authorize('admin'),
   validateParams(driverId),
   deleteDriverController
 );

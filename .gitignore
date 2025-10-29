@@ -13,13 +13,23 @@ lerna-debug.log*
 .env.test.local
 .env.production.local
 
-# Logs
+# Logs - Comprehensive exclusion
 logs/
 *.log
+*.log.*
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 lerna-debug.log*
+combined-*.log
+debug-*.log
+error-*.log
+info-*.log
+exceptions.log
+rejections.log
+audit.json
+*.audit.json
 
 # Runtime data
 pids
@@ -109,6 +119,3 @@ coverage/
 # Build outputs (if any)
 dist/
 build/
-
-# logs
-logs/

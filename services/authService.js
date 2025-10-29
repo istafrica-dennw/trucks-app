@@ -16,24 +16,21 @@ class AuthService {
   }
 
   /**
-   * Login user with email/phone and password
-   * @param {string} login - Email or phone number
+   * Login user with username and password
+   * @param {string} login - Username
    * @param {string} password - User password
    * @returns {Object} User data and token
    */
   async login(login, password) {
     try {
-      // Find user by email or phone (explicitly select password field)
+      // Find user by username (explicitly select password field)
       const user = await User.findOne({
-        $or: [
-          { email: login },
-          { phone: login }
-        ]
+        username: login
       }).select('+password');
 
       if (!user) {
         logger.security('Login attempt failed - user not found', {
-          login: login,
+          username: login,
           ip: 'unknown' // Will be set by controller
         });
         throw new Error('Invalid credentials');
@@ -43,7 +40,7 @@ class AuthService {
       if (!user.isActive) {
         logger.security('Login attempt failed - user inactive', {
           userId: user._id,
-          login: login,
+          username: login,
           ip: 'unknown'
         });
         throw new Error('Account is deactivated');
@@ -54,7 +51,7 @@ class AuthService {
       if (!isPasswordValid) {
         logger.security('Login attempt failed - invalid password', {
           userId: user._id,
-          login: login,
+          username: login,
           ip: 'unknown'
         });
         throw new Error('Invalid credentials');
@@ -70,8 +67,6 @@ class AuthService {
       logger.auth('User login successful', {
         userId: user._id,
         username: user.username,
-        email: user.email,
-        phone: user.phone,
         role: user.role,
         ip: 'unknown'
       });
@@ -80,11 +75,8 @@ class AuthService {
       const userData = {
         id: user._id,
         username: user.username,
-        email: user.email,
-        phone: user.phone,
         role: user.role,
         isActive: user.isActive,
-        emailVerified: user.emailVerified,
         lastLogin: user.lastLogin
       };
 
@@ -95,7 +87,7 @@ class AuthService {
     } catch (error) {
       logger.error('Login service error', {
         error: error.message,
-        login: login,
+        username: login,
         stack: error.stack
       });
       throw error;
@@ -125,11 +117,8 @@ class AuthService {
       return {
         id: user._id,
         username: user.username,
-        email: user.email,
-        phone: user.phone,
         role: user.role,
         isActive: user.isActive,
-        emailVerified: user.emailVerified,
         lastLogin: user.lastLogin,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt
@@ -152,38 +141,23 @@ class AuthService {
    */
   async updateUserProfile(userId, updateData) {
     try {
-      const { email, phone } = updateData;
+      const { username } = updateData;
 
-      // Check for duplicate email
-      if (email) {
+      // Check for duplicate username
+      if (username) {
         const existingUser = await User.findOne({ 
-          email: email, 
+          username: username, 
           _id: { $ne: userId } 
         });
         if (existingUser) {
-          throw new Error('Email already exists');
-        }
-      }
-
-      // Check for duplicate phone
-      if (phone) {
-        const existingUser = await User.findOne({ 
-          phone: phone, 
-          _id: { $ne: userId } 
-        });
-        if (existingUser) {
-          throw new Error('Phone number already exists');
+          throw new Error('Username already exists');
         }
       }
 
       // Prepare update data
       const updateFields = {};
-      if (email) {
-        updateFields.email = email;
-        updateFields.emailVerified = false; // Reset email verification if email changed
-      }
-      if (phone) {
-        updateFields.phone = phone;
+      if (username) {
+        updateFields.username = username;
       }
 
       const user = await User.findByIdAndUpdate(
@@ -206,11 +180,8 @@ class AuthService {
       return {
         id: user._id,
         username: user.username,
-        email: user.email,
-        phone: user.phone,
         role: user.role,
         isActive: user.isActive,
-        emailVerified: user.emailVerified,
         lastLogin: user.lastLogin,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt

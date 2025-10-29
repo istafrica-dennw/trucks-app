@@ -1,35 +1,21 @@
 import Joi from 'joi';
 
 // Common validation patterns
-const emailPattern = Joi.string().email().trim().lowercase();
-const phonePattern = Joi.string().pattern(/^\+?[1-9]\d{1,14}$/).trim();
 const passwordPattern = Joi.string().min(6).max(128);
-const usernamePattern = Joi.string().min(3).max(30).trim();
+const usernamePattern = Joi.string().min(3).max(30).trim().pattern(/^[a-zA-Z0-9_]+$/);
 const objectIdPattern = Joi.string().pattern(/^[0-9a-fA-F]{24}$/);
 
 // Auth validation schemas
 const authValidators = {
   // Login validation
   login: Joi.object({
-    login: Joi.string()
-      .trim()
+    login: usernamePattern
       .required()
-      .custom((value, helpers) => {
-        // Check if it's a valid email or phone
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        const phoneRegex = /^\+?[1-9]\d{1,14}$/;
-        
-        if (emailRegex.test(value)) {
-          return value.toLowerCase();
-        } else if (phoneRegex.test(value)) {
-          return value;
-        } else {
-          return helpers.error('alternatives.match');
-        }
-      })
       .messages({
-        'alternatives.match': 'Login must be a valid email address or phone number',
-        'any.required': 'Login field is required (email or phone)'
+        'string.pattern.base': 'Username can only contain letters, numbers, and underscores',
+        'string.min': 'Username must be at least 3 characters long',
+        'string.max': 'Username cannot exceed 30 characters',
+        'any.required': 'Username is required'
       }),
     password: passwordPattern
       .required()
@@ -41,18 +27,15 @@ const authValidators = {
 
   // Profile update validation
   updateProfile: Joi.object({
-    email: emailPattern
+    username: usernamePattern
       .optional()
       .messages({
-        'string.email': 'Please provide a valid email address'
-      }),
-    phone: phonePattern
-      .optional()
-      .messages({
-        'string.pattern.base': 'Please provide a valid phone number'
+        'string.pattern.base': 'Username can only contain letters, numbers, and underscores',
+        'string.min': 'Username must be at least 3 characters long',
+        'string.max': 'Username cannot exceed 30 characters'
       })
   }).min(1).messages({
-    'object.min': 'At least one field (email or phone) must be provided for update'
+    'object.min': 'At least one field (username) must be provided for update'
   }),
 
   // User ID parameter validation

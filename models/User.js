@@ -3,21 +3,15 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 
 const userSchema = new mongoose.Schema({
-
-  email: {
+  username: {
     type: String,
-    required: [true, 'Email is required'],
+    required: [true, 'Username is required'],
     unique: true,
     lowercase: true,
     trim: true,
-    match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
-  },
-  phone: {
-    type: String,
-    required: [true, 'Phone number is required'],
-    unique: true,
-    trim: true,
-    match: [/^\+?[\d\s\-\(\)]+$/, 'Please enter a valid phone number']
+    minlength: [3, 'Username must be at least 3 characters long'],
+    maxlength: [30, 'Username cannot exceed 30 characters'],
+    match: [/^[a-zA-Z0-9_]+$/, 'Username can only contain letters, numbers, and underscores']
   },
   password: {
     type: String,
@@ -38,20 +32,12 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
-  emailVerified: {
-    type: Boolean,
-    default: false
-  },
-  emailVerificationToken: String,
-  emailVerificationExpires: Date,
-  lastLogin: Date,
-  passwordResetToken: String,
-  passwordResetExpires: Date
+  lastLogin: Date
 }, {
   timestamps: true
 });
 
-// Indexes for better performance (email and phone already have unique indexes)
+// Indexes for better performance (username already has unique index)
 userSchema.index({ role: 1 });
 userSchema.index({ isActive: 1 });
 
@@ -75,34 +61,6 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-// Generate email verification token
-userSchema.methods.generateEmailVerificationToken = function() {
-  const token = crypto.randomBytes(32).toString('hex');
-  
-  this.emailVerificationToken = crypto
-    .createHash('sha256')
-    .update(token)
-    .digest('hex');
-  
-  this.emailVerificationExpires = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
-  
-  return token;
-};
-
-// Generate password reset token
-userSchema.methods.generatePasswordResetToken = function() {
-  const token = crypto.randomBytes(32).toString('hex');
-  
-  this.passwordResetToken = crypto
-    .createHash('sha256')
-    .update(token)
-    .digest('hex');
-  
-  this.passwordResetExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
-  
-  return token;
-};
-
 // Update last login
 userSchema.methods.updateLastLogin = function() {
   this.lastLogin = new Date();
@@ -113,10 +71,6 @@ userSchema.methods.updateLastLogin = function() {
 userSchema.methods.toJSON = function() {
   const userObject = this.toObject();
   delete userObject.password;
-  delete userObject.emailVerificationToken;
-  delete userObject.emailVerificationExpires;
-  delete userObject.passwordResetToken;
-  delete userObject.passwordResetExpires;
   return userObject;
 };
 

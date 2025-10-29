@@ -1,10 +1,8 @@
 import Joi from 'joi';
 
 // Common validation patterns
-const emailPattern = Joi.string().email().trim().lowercase();
-const phonePattern = Joi.string().pattern(/^\+?[1-9]\d{1,14}$/).trim();
 const passwordPattern = Joi.string().min(6).max(128);
-const usernamePattern = Joi.string().min(3).max(30).trim();
+const usernamePattern = Joi.string().min(3).max(30).trim().pattern(/^[a-zA-Z0-9_]+$/);
 const objectIdPattern = Joi.string().pattern(/^[0-9a-fA-F]{24}$/);
 
 // User validation schemas
@@ -30,17 +28,13 @@ const userValidators = {
 
   // Create user validation
   createUser: Joi.object({
-    email: emailPattern
+    username: usernamePattern
       .required()
       .messages({
-        'string.email': 'Please provide a valid email address',
-        'any.required': 'Email is required'
-      }),
-    phone: phonePattern
-      .required()
-      .messages({
-        'string.pattern.base': 'Please provide a valid phone number',
-        'any.required': 'Phone number is required'
+        'string.pattern.base': 'Username can only contain letters, numbers, and underscores',
+        'string.min': 'Username must be at least 3 characters long',
+        'string.max': 'Username cannot exceed 30 characters',
+        'any.required': 'Username is required'
       }),
     password: passwordPattern
       .required()
@@ -53,15 +47,12 @@ const userValidators = {
 
   // Update user validation
   updateUser: Joi.object({
-    email: emailPattern
+    username: usernamePattern
       .optional()
       .messages({
-        'string.email': 'Please provide a valid email address'
-      }),
-    phone: phonePattern
-      .optional()
-      .messages({
-        'string.pattern.base': 'Please provide a valid phone number'
+        'string.pattern.base': 'Username can only contain letters, numbers, and underscores',
+        'string.min': 'Username must be at least 3 characters long',
+        'string.max': 'Username cannot exceed 30 characters'
       }),
     role: Joi.string()
       .valid('admin', 'user')
