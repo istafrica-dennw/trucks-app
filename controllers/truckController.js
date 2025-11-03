@@ -1,4 +1,5 @@
 import truckService from '../services/truckService.js';
+import { createTruckActivity } from '../services/activityService.js';
 import logger from '../utils/logger.js';
 
 class TruckController {
@@ -53,6 +54,13 @@ class TruckController {
     try {
       const truck = await truckService.createTruck(req.body);
       
+      // Create activity for truck added
+      try {
+        await createTruckActivity(truck, req.user, 'added');
+      } catch (activityError) {
+        logger.warn('Failed to create truck activity', { error: activityError.message, truckId: truck._id });
+      }
+      
       res.status(201).json({
         success: true,
         data: truck,
@@ -80,6 +88,13 @@ class TruckController {
     try {
       const { id } = req.params;
       const truck = await truckService.updateTruck(id, req.body);
+      
+      // Create activity for truck updated
+      try {
+        await createTruckActivity(truck, req.user, 'updated');
+      } catch (activityError) {
+        logger.warn('Failed to create truck update activity', { error: activityError.message, truckId: truck._id });
+      }
       
       res.status(200).json({
         success: true,

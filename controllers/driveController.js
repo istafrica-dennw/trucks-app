@@ -10,6 +10,7 @@ import {
   getDrivesByDriver,
   getDrivesByDate
 } from '../services/driveService.js';
+import { createJourneyActivity, createPaymentActivity } from '../services/activityService.js';
 import logger from '../utils/logger.js';
 
 export const getAllDrivesController = async (req, res) => {
@@ -81,6 +82,13 @@ export const createDriveController = async (req, res) => {
     
     const drive = await createDrive(driveData, userId);
 
+    // Create activity for journey started
+    try {
+      await createJourneyActivity(drive, req.user, 'started');
+    } catch (activityError) {
+      logger.warn('Failed to create journey activity', { error: activityError.message, driveId: drive._id });
+    }
+
     res.status(201).json({
       success: true,
       message: 'Drive created successfully',
@@ -109,7 +117,18 @@ export const updateDriveController = async (req, res) => {
     const { id } = req.params;
     const updateData = req.body;
     
+    // Get the original drive to check status changes
+    const originalDrive = await getDriveById(id);
     const drive = await updateDrive(id, updateData);
+
+    // Create activity if status changed to completed
+    if (originalDrive && originalDrive.status !== 'completed' && drive.status === 'completed') {
+      try {
+        await createJourneyActivity(drive, req.user, 'completed');
+      } catch (activityError) {
+        logger.warn('Failed to create journey completion activity', { error: activityError.message, driveId: drive._id });
+      }
+    }
 
     res.status(200).json({
       success: true,
@@ -174,6 +193,19 @@ export const addInstallmentController = async (req, res) => {
     const installmentData = req.body;
     
     const drive = await addInstallment(id, installmentData);
+
+    // Create activity for installment payment
+    try {
+      const paymentData = {
+        amount: installmentData.amount,
+        method: installmentData.note || 'installment',
+        remainingBalance: drive.balance || 0,
+        installmentNumber: drive.pay?.installments?.length || 1
+      };
+      await createPaymentActivity(drive, paymentData, req.user, 'installment_paid');
+    } catch (activityError) {
+      logger.warn('Failed to create payment activity', { error: activityError.message, driveId: drive._id });
+    }
 
     res.status(200).json({
       success: true,
