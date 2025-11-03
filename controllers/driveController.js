@@ -145,7 +145,7 @@ export const updateDriveController = async (req, res) => {
       });
     }
 
-    if (error.message.includes('exceed')) {
+    if (error.message.includes('exceed') || error.message.includes('Payment incomplete') || error.message.includes('Cannot complete journey')) {
       return res.status(400).json({
         success: false,
         message: error.message

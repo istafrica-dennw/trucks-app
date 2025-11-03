@@ -189,6 +189,22 @@ export const updateDrive = async (driveId, updateData) => {
       throw new Error('Drive not found');
     }
 
+    // Check if trying to complete journey with incomplete payment
+    if (updateData.status === 'completed' && drive.status !== 'completed') {
+      const totalPaid = drive.totalPaid || 0;
+      const totalAmount = drive.pay.totalAmount || 0;
+      
+      if (totalPaid < totalAmount) {
+        logger.warn('Journey completion blocked - payment incomplete', {
+          driveId,
+          totalAmount,
+          totalPaid,
+          remaining: totalAmount - totalPaid
+        });
+        throw new Error(`Cannot complete journey. Payment incomplete. Total required: $${totalAmount.toFixed(2)}, Total paid: $${totalPaid.toFixed(2)}, Remaining: $${(totalAmount - totalPaid).toFixed(2)}`);
+      }
+    }
+
     // Validate payment structure if being updated
     if (updateData.pay) {
       if (updateData.pay.paidOption === 'full') {

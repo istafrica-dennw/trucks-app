@@ -254,6 +254,14 @@ driveSchema.methods.addInstallment = function(installment) {
 
 // Instance method to complete journey
 driveSchema.methods.completeJourney = function() {
+  // Check if payment is fully paid before completing
+  const totalPaid = this.totalPaid || 0;
+  const totalAmount = this.pay.totalAmount || 0;
+  
+  if (totalPaid < totalAmount) {
+    throw new Error(`Cannot complete journey. Payment incomplete. Total required: $${totalAmount.toFixed(2)}, Total paid: $${totalPaid.toFixed(2)}, Remaining: $${(totalAmount - totalPaid).toFixed(2)}`);
+  }
+  
   this.status = 'completed';
   return this.save();
 };
