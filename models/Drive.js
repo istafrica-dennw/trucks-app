@@ -58,6 +58,24 @@ const driveSchema = new mongoose.Schema({
       required: [true, 'Payment option is required'],
       enum: ['full', 'installment']
     },
+    attachment: {
+      filename: {
+        type: String,
+        required: false
+      },
+      path: {
+        type: String,
+        required: false
+      },
+      mimetype: {
+        type: String,
+        required: false
+      },
+      size: {
+        type: Number,
+        required: false
+      }
+    },
     installments: [{
       amount: {
         type: Number,
@@ -69,9 +87,23 @@ const driveSchema = new mongoose.Schema({
         required: true,
         default: Date.now
       },
-      note: {
-        type: String,
-        trim: true
+      attachment: {
+        filename: {
+          type: String,
+          required: [true, 'Proof of payment attachment is required']
+        },
+        path: {
+          type: String,
+          required: [true, 'Attachment path is required']
+        },
+        mimetype: {
+          type: String,
+          required: [true, 'Attachment MIME type is required']
+        },
+        size: {
+          type: Number,
+          required: [true, 'Attachment size is required']
+        }
       }
     }]
   },

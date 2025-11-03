@@ -209,11 +209,81 @@ export const updateDrive = async (driveId, updateData) => {
     if (updateData.pay) {
       if (updateData.pay.paidOption === 'full') {
         updateData.pay.installments = [];
+      } else if (updateData.pay.installments && Array.isArray(updateData.pay.installments)) {
+        // Preserve existing attachments when updating installments
+        updateData.pay.installments = updateData.pay.installments.map((newInst, index) => {
+          // If this installment already exists at this index, preserve its attachment
+          const existingInst = drive.pay.installments && drive.pay.installments[index];
+          if (existingInst && existingInst.attachment) {
+            // Preserve existing attachment if new data doesn't have it or has incomplete attachment data
+            if (!newInst.attachment || !newInst.attachment.filename || !newInst.attachment.path) {
+              return {
+                ...newInst,
+                attachment: existingInst.attachment
+              };
+            }
+          }
+          // Otherwise, use the new installment data as-is (should have complete attachment if provided)
+          return newInst;
+        });
       }
     }
 
-    // Update drive
-    Object.assign(drive, updateData);
+    // Update drive - preserve existing installment attachments and full payment attachment
+    if (updateData.pay) {
+      drive.pay.totalAmount = updateData.pay.totalAmount ?? drive.pay.totalAmount;
+      drive.pay.paidOption = updateData.pay.paidOption ?? drive.pay.paidOption;
+      
+      // Handle full payment attachment
+      if (updateData.pay.paidOption === 'full') {
+        // If new attachment is provided, use it; otherwise preserve existing
+        if (updateData.pay.attachment && updateData.pay.attachment.filename) {
+          drive.pay.attachment = updateData.pay.attachment;
+        } else if (!updateData.pay.attachment && drive.pay.attachment) {
+          // Preserve existing attachment if no new one is provided
+          drive.pay.attachment = drive.pay.attachment;
+        }
+      } else {
+        // For installment payments, clear full payment attachment
+        drive.pay.attachment = undefined;
+      }
+      
+      if (updateData.pay.installments !== undefined) {
+        // Merge installments carefully to preserve existing attachments
+        const updatedInstallments = updateData.pay.installments.map((newInst, index) => {
+          // Check if we have an existing installment at this index
+          const existingInst = drive.pay.installments && drive.pay.installments[index];
+          
+          // If existing installment has attachment and new one doesn't have complete attachment, preserve it
+          if (existingInst && existingInst.attachment && 
+              (!newInst.attachment || !newInst.attachment.filename || !newInst.attachment.path)) {
+            return {
+              amount: parseFloat(newInst.amount),
+              date: newInst.date ? new Date(newInst.date) : existingInst.date,
+              attachment: existingInst.attachment // Preserve existing attachment
+            };
+          }
+          
+          // Otherwise use new installment data (which should have attachment if it's a new one)
+          return {
+            amount: parseFloat(newInst.amount),
+            date: newInst.date ? new Date(newInst.date) : new Date(),
+            attachment: newInst.attachment || existingInst?.attachment
+          };
+        });
+        
+        drive.pay.installments = updatedInstallments;
+      }
+    }
+    
+    // Update other fields
+    const fieldsToUpdate = ['driver', 'truck', 'departureCity', 'destinationCity', 'cargo', 'customer', 'notes', 'status', 'date', 'expenses'];
+    fieldsToUpdate.forEach(field => {
+      if (updateData[field] !== undefined) {
+        drive[field] = updateData[field];
+      }
+    });
+    
     await drive.save();
 
     // Populate the updated drive

@@ -1,6 +1,7 @@
 import express from 'express';
 import { protect, authorize } from '../middleware/auth.js';
 import { validate, validateParams, validateQuery } from '../middleware/validation.js';
+import { uploadPaymentProof } from '../middleware/upload.js';
 import {
   driveId,
   getAllDrives,
@@ -18,7 +19,9 @@ import {
   getDriveStatsController,
   getDrivesByTruckController,
   getDrivesByDriverController,
-  getDrivesByDateController
+  getDrivesByDateController,
+  getPaymentProofController,
+  getFullPaymentProofController
 } from '../controllers/driveController.js';
 
 const router = express.Router();
@@ -54,23 +57,39 @@ router.get('/by-driver/:driverId',
 );
 
 // POST /api/drives - Create new drive (admin only)
+// Note: For full payment with attachment, we use FormData, so validation is done in controller
 router.post('/', 
   authorize('admin'),
-  validate(createDrive),
+  uploadPaymentProof,
   createDriveController
 );
 
-// GET /api/drives/:id - Get drive by ID
+// IMPORTANT: More specific routes must come before generic /:id route
+// GET /api/drives/:id/payment-proof - Get full payment proof attachment
+router.get('/:id/payment-proof',
+  protect,
+  getFullPaymentProofController
+);
+
+// GET /api/drives/:id/installment/:installmentIndex/proof - Get installment payment proof attachment
+// Note: We don't use validateParams here because it strips installmentIndex due to stripUnknown: true
+router.get('/:id/installment/:installmentIndex/proof',
+  protect,
+  getPaymentProofController
+);
+
+// GET /api/drives/:id - Get drive by ID (must come after specific routes)
 router.get('/:id', 
   validateParams(driveId),
   getDriveByIdController
 );
 
 // PUT /api/drives/:id - Update drive (admin only)
+// Note: For full payment with attachment, we use FormData, so validation is done in controller
 router.put('/:id', 
   authorize('admin'),
   validateParams(driveId),
-  validate(updateDrive),
+  uploadPaymentProof,
   updateDriveController
 );
 
@@ -85,7 +104,7 @@ router.delete('/:id',
 router.post('/:id/installment', 
   authorize('admin'),
   validateParams(driveId),
-  validate(addInstallment),
+  uploadPaymentProof,
   addInstallmentController
 );
 
