@@ -57,10 +57,10 @@ router.get('/by-driver/:driverId',
   getDrivesByDriverController
 );
 
-// POST /api/drives - Create new drive (admin only)
+// POST /api/drives - Create new drive (admin/officer only)
 // Note: For full payment with attachment, we use FormData, so validation is done in controller
 router.post('/', 
-  authorize('admin'),
+  authorize('admin', 'officer'),
   uploadPaymentProof,
   createDriveController
 );
@@ -91,25 +91,25 @@ router.get('/:id',
   getDriveByIdController
 );
 
-// PUT /api/drives/:id - Update drive (admin only)
+// PUT /api/drives/:id - Update drive (admin/officer only)
 // Note: For full payment with attachment, we use FormData, so validation is done in controller
 router.put('/:id', 
-  authorize('admin'),
+  authorize('admin', 'officer'),
   validateParams(driveId),
   uploadPaymentProof,
   updateDriveController
 );
 
-// DELETE /api/drives/:id - Delete drive (admin only)
+// DELETE /api/drives/:id - Delete drive (admin/officer only)
 router.delete('/:id', 
-  authorize('admin'),
+  authorize('admin', 'officer'),
   validateParams(driveId),
   deleteDriveController
 );
 
-// POST /api/drives/:id/installment - Add installment payment (admin only)
+// POST /api/drives/:id/installment - Add installment payment (admin/officer only)
 router.post('/:id/installment', 
-  authorize('admin'),
+  authorize('admin', 'officer'),
   validateParams(driveId),
   uploadPaymentProof,
   addInstallmentController

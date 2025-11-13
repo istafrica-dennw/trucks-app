@@ -11,7 +11,7 @@ const userValidators = {
   getAllUsers: Joi.object({
     page: Joi.number().integer().min(1).default(1),
     limit: Joi.number().integer().min(1).max(100).default(10),
-    role: Joi.string().valid('admin', 'user').optional(),
+    role: Joi.string().valid('admin', 'user', 'officer').optional(),
     isActive: Joi.boolean().optional(),
     search: Joi.string().trim().max(100).optional()
   }),
@@ -55,10 +55,10 @@ const userValidators = {
         'string.max': 'Username cannot exceed 30 characters'
       }),
     role: Joi.string()
-      .valid('admin', 'user')
+      .valid('admin', 'user', 'officer')
       .optional()
       .messages({
-        'any.only': 'Role must be either admin or user'
+        'any.only': 'Role must be either admin, user, or officer'
       }),
     isActive: Joi.boolean()
       .optional()

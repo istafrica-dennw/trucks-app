@@ -38,9 +38,9 @@ router.get('/status/:status',
   getDriversByStatusController
 );
 
-// POST /api/drivers - Create new driver (admin only)
+// POST /api/drivers - Create new driver (admin/officer only)
 router.post('/', 
-  authorize('admin'),
+  authorize('admin', 'officer'),
   validate(createDriver),
   createDriverController
 );
@@ -51,17 +51,17 @@ router.get('/:id',
   getDriverByIdController
 );
 
-// PUT /api/drivers/:id - Update driver (admin only)
+// PUT /api/drivers/:id - Update driver (admin/officer only)
 router.put('/:id', 
-  authorize('admin'),
+  authorize('admin', 'officer'),
   validateParams(driverId),
   validate(updateDriver),
   updateDriverController
 );
 
-// DELETE /api/drivers/:id - Delete driver (admin only)
+// DELETE /api/drivers/:id - Delete driver (admin/officer only)
 router.delete('/:id', 
-  authorize('admin'),
+  authorize('admin', 'officer'),
   validateParams(driverId),
   deleteDriverController
 );

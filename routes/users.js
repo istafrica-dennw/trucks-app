@@ -11,32 +11,32 @@ router.use(protect);
 
 // @desc    Get all users with pagination and filtering
 // @route   GET /api/users
-// @access  Private (Admin only)
-router.get('/', authorize('admin'), validateQuery(userValidators.getAllUsers), userController.getAllUsers.bind(userController));
+// @access  Private (Admin/Officer only)
+router.get('/', authorize('admin', 'officer'), validateQuery(userValidators.getAllUsers), userController.getAllUsers.bind(userController));
 
 // @desc    Get user statistics
 // @route   GET /api/users/stats
-// @access  Private (Admin only)
-router.get('/stats', authorize('admin'), userController.getUserStats.bind(userController));
+// @access  Private (Admin/Officer only)
+router.get('/stats', authorize('admin', 'officer'), userController.getUserStats.bind(userController));
 
 // @desc    Get user by ID
 // @route   GET /api/users/:id
-// @access  Private (Admin only)
-router.get('/:id', authorize('admin'), validateParams(userValidators.userId), userController.getUserById.bind(userController));
+// @access  Private (Admin/Officer only)
+router.get('/:id', authorize('admin', 'officer'), validateParams(userValidators.userId), userController.getUserById.bind(userController));
 
 // @desc    Create new user
 // @route   POST /api/users
-// @access  Private (Admin only)
-router.post('/', authorize('admin'), validateBody(userValidators.createUser), userController.createUser.bind(userController));
+// @access  Private (Admin/Officer only)
+router.post('/', authorize('admin', 'officer'), validateBody(userValidators.createUser), userController.createUser.bind(userController));
 
 // @desc    Update user
 // @route   PUT /api/users/:id
-// @access  Private (Admin only)
-router.put('/:id', authorize('admin'), validateParams(userValidators.userId), validateBody(userValidators.updateUser), userController.updateUser.bind(userController));
+// @access  Private (Admin/Officer only)
+router.put('/:id', authorize('admin', 'officer'), validateParams(userValidators.userId), validateBody(userValidators.updateUser), userController.updateUser.bind(userController));
 
 // @desc    Delete user
 // @route   DELETE /api/users/:id
-// @access  Private (Admin only)
-router.delete('/:id', authorize('admin'), validateParams(userValidators.userId), userController.deleteUser.bind(userController));
+// @access  Private (Admin/Officer only)
+router.delete('/:id', authorize('admin', 'officer'), validateParams(userValidators.userId), userController.deleteUser.bind(userController));
 
 export default router;

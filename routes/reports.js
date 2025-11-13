@@ -1,5 +1,5 @@
 import express from 'express';
-import { protect } from '../middleware/auth.js';
+import { protect, requireAdmin } from '../middleware/auth.js';
 import { validateParams, validateQuery } from '../middleware/validation.js';
 import * as reportController from '../controllers/reportController.js';
 import { daily, weekly, monthly, custom } from '../validators/reportValidators.js';
@@ -7,6 +7,7 @@ import { daily, weekly, monthly, custom } from '../validators/reportValidators.j
 const router = express.Router();
 
 router.use(protect);
+router.use(requireAdmin); // Reports are admin-only
 
 router.get('/daily/:date', validateParams(daily), reportController.dailyReport);
 router.get('/weekly/:week', validateParams(weekly), reportController.weeklyReport);

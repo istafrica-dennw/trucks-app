@@ -81,11 +81,22 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
-// Check if user can modify their own data or is admin
+// Check if user is admin or officer
+const requireAdminOrOfficer = (req, res, next) => {
+  if (req.user.role !== 'admin' && req.user.role !== 'officer') {
+    return res.status(403).json({
+      success: false,
+      message: 'Admin or Officer access required'
+    });
+  }
+  next();
+};
+
+// Check if user can modify their own data or is admin/officer
 const requireOwnershipOrAdmin = (req, res, next) => {
   const resourceUserId = req.params.userId || req.body.userId;
   
-  if (req.user.role === 'admin' || req.user._id.toString() === resourceUserId) {
+  if (req.user.role === 'admin' || req.user.role === 'officer' || req.user._id.toString() === resourceUserId) {
     return next();
   }
   
@@ -128,6 +139,7 @@ export {
   protect,
   authorize,
   requireAdmin,
+  requireAdminOrOfficer,
   requireOwnershipOrAdmin,
   optionalAuth
 };

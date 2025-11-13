@@ -48,18 +48,18 @@ router.get('/:id',
 
 // @desc    Create new truck
 // @route   POST /api/trucks
-// @access  Private (Admin only)
+// @access  Private (Admin/Officer only)
 router.post('/', 
-  authorize('admin'),
+  authorize('admin', 'officer'),
   validateBody(truckValidators.createTruck), 
   truckController.createTruck.bind(truckController)
 );
 
 // @desc    Update truck
 // @route   PUT /api/trucks/:id
-// @access  Private (Admin only)
+// @access  Private (Admin/Officer only)
 router.put('/:id', 
-  authorize('admin'),
+  authorize('admin', 'officer'),
   validateParams(truckValidators.truckId),
   validateBody(truckValidators.updateTruck), 
   truckController.updateTruck.bind(truckController)
@@ -67,9 +67,9 @@ router.put('/:id',
 
 // @desc    Delete truck
 // @route   DELETE /api/trucks/:id
-// @access  Private (Admin only)
+// @access  Private (Admin/Officer only)
 router.delete('/:id', 
-  authorize('admin'),
+  authorize('admin', 'officer'),
   validateParams(truckValidators.truckId), 
   truckController.deleteTruck.bind(truckController)
 );
