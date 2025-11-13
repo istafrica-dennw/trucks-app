@@ -21,7 +21,8 @@ import {
   getDrivesByDriverController,
   getDrivesByDateController,
   getPaymentProofController,
-  getFullPaymentProofController
+  getFullPaymentProofController,
+  getExpenseProofController
 } from '../controllers/driveController.js';
 
 const router = express.Router();
@@ -69,6 +70,12 @@ router.post('/',
 router.get('/:id/payment-proof',
   protect,
   getFullPaymentProofController
+);
+
+// GET /api/drives/:id/expense/:expenseIndex/proof - Get expense proof attachment
+router.get('/:id/expense/:expenseIndex/proof',
+  protect,
+  getExpenseProofController
 );
 
 // GET /api/drives/:id/installment/:installmentIndex/proof - Get installment payment proof attachment

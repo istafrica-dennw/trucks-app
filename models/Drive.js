@@ -45,6 +45,24 @@ const driveSchema = new mongoose.Schema({
     note: {
       type: String,
       trim: true
+    },
+    attachment: {
+      filename: {
+        type: String,
+        required: false
+      },
+      path: {
+        type: String,
+        required: false
+      },
+      mimetype: {
+        type: String,
+        required: false
+      },
+      size: {
+        type: Number,
+        required: false
+      }
     }
   }],
   pay: {
@@ -52,6 +70,17 @@ const driveSchema = new mongoose.Schema({
       type: Number,
       required: [true, 'Total amount is required'],
       min: [0, 'Total amount cannot be negative']
+    },
+    currency: {
+      type: String,
+      required: [true, 'Currency is required'],
+      enum: ['USD', 'RWF', 'UGX', 'TZX'],
+      default: 'RWF'
+    },
+    exchangeRate: {
+      type: Number,
+      default: 1,
+      min: [0, 'Exchange rate cannot be negative']
     },
     paidOption: {
       type: String,
@@ -168,11 +197,25 @@ driveSchema.virtual('totalPaid').get(function() {
   return this.pay.installments.reduce((total, installment) => total + installment.amount, 0);
 });
 
-// Virtual for balance (total paid - total expenses)
+// Virtual for balance (total paid - expenses converted to journey currency)
+// Expenses are always in RWF, so we need to convert them to the journey's currency
+// Balance represents the remaining amount after subtracting expenses from what was paid
 driveSchema.virtual('calculatedBalance').get(function() {
   const totalPaid = this.totalPaid || 0;
-  const totalExpenses = this.totalExpenses || 0;
-  return totalPaid - totalExpenses;
+  const totalExpensesRWF = this.totalExpenses || 0;
+  
+  // Convert expenses from RWF to journey currency
+  const currency = this.pay?.currency || 'RWF';
+  const exchangeRate = this.pay?.exchangeRate || 1;
+  
+  let totalExpensesInCurrency = totalExpensesRWF;
+  if (currency !== 'RWF') {
+    // Convert RWF expenses to journey currency (divide by exchange rate)
+    totalExpensesInCurrency = totalExpensesRWF / exchangeRate;
+  }
+  
+  // Balance = Total Paid - Expenses (all in journey currency)
+  return totalPaid - totalExpensesInCurrency;
 });
 
 // Virtual for is fully paid
@@ -196,8 +239,21 @@ driveSchema.pre('save', function(next) {
     }
   }
   
-  // Calculate and update balance
-  this.balance = this.calculatedBalance;
+  // Recalculate balance using the virtual (ensures it's always correct)
+  // This ensures balance is recalculated whenever the journey is saved
+  const totalPaid = this.totalPaid || 0;
+  const totalExpensesRWF = this.totalExpenses || 0;
+  const currency = this.pay?.currency || 'RWF';
+  const exchangeRate = this.pay?.exchangeRate || 1;
+  
+  let totalExpensesInCurrency = totalExpensesRWF;
+  if (currency !== 'RWF') {
+    // Convert RWF expenses to journey currency (divide by exchange rate)
+    totalExpensesInCurrency = totalExpensesRWF / exchangeRate;
+  }
+  
+  // Balance = Total Paid - Expenses (all in journey currency)
+  this.balance = totalPaid - totalExpensesInCurrency;
   
   next();
 });

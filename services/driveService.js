@@ -123,6 +123,26 @@ export const getDriveById = async (driveId) => {
       logger.warn('Drive not found', { driveId });
       return null;
     }
+    
+    // Ensure balance is recalculated using the virtual (in case stored balance is outdated)
+    // The virtual will be included in toJSON/toObject, but we also update the stored value
+    const totalPaid = drive.totalPaid || 0;
+    const totalExpensesRWF = drive.totalExpenses || 0;
+    const currency = drive.pay?.currency || 'RWF';
+    const exchangeRate = drive.pay?.exchangeRate || 1;
+    
+    let totalExpensesInCurrency = totalExpensesRWF;
+    if (currency !== 'RWF') {
+      totalExpensesInCurrency = totalExpensesRWF / exchangeRate;
+    }
+    
+    // Update balance if it's different (to fix any old incorrect balances)
+    const correctBalance = totalPaid - totalExpensesInCurrency;
+    if (Math.abs(drive.balance - correctBalance) > 0.01) {
+      drive.balance = correctBalance;
+      // Save without triggering validation to avoid infinite loops
+      await Drive.findByIdAndUpdate(driveId, { balance: correctBalance }, { runValidators: false });
+    }
 
     logger.info('Retrieved drive details', { driveId });
     return drive;
@@ -232,6 +252,8 @@ export const updateDrive = async (driveId, updateData) => {
     // Update drive - preserve existing installment attachments and full payment attachment
     if (updateData.pay) {
       drive.pay.totalAmount = updateData.pay.totalAmount ?? drive.pay.totalAmount;
+      drive.pay.currency = updateData.pay.currency ?? drive.pay.currency ?? 'RWF';
+      drive.pay.exchangeRate = updateData.pay.exchangeRate ?? drive.pay.exchangeRate ?? 1;
       drive.pay.paidOption = updateData.pay.paidOption ?? drive.pay.paidOption;
       
       // Handle full payment attachment
@@ -276,8 +298,34 @@ export const updateDrive = async (driveId, updateData) => {
       }
     }
     
+    // Update expenses - preserve existing attachments
+    if (updateData.expenses !== undefined) {
+      drive.expenses = updateData.expenses.map((newExpense, index) => {
+        const existingExpense = drive.expenses && drive.expenses[index];
+        
+        // If existing expense has attachment and new one doesn't have complete attachment data, preserve it
+        if (existingExpense && existingExpense.attachment && 
+            (!newExpense.attachment || !newExpense.attachment.filename || !newExpense.attachment.path)) {
+          return {
+            title: newExpense.title,
+            amount: parseFloat(newExpense.amount),
+            note: newExpense.note || '',
+            attachment: existingExpense.attachment
+          };
+        }
+        
+        // Otherwise use new expense data (with attachment if provided)
+        return {
+          title: newExpense.title,
+          amount: parseFloat(newExpense.amount),
+          note: newExpense.note || '',
+          attachment: newExpense.attachment || existingExpense?.attachment
+        };
+      });
+    }
+    
     // Update other fields
-    const fieldsToUpdate = ['driver', 'truck', 'departureCity', 'destinationCity', 'cargo', 'customer', 'notes', 'status', 'date', 'expenses'];
+    const fieldsToUpdate = ['driver', 'truck', 'departureCity', 'destinationCity', 'cargo', 'customer', 'notes', 'status', 'date'];
     fieldsToUpdate.forEach(field => {
       if (updateData[field] !== undefined) {
         drive[field] = updateData[field];

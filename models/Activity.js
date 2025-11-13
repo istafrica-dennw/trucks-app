@@ -173,3 +173,4 @@ activitySchema.statics.getActivitiesByType = async function(type, limit = 20) {
 const Activity = mongoose.model('Activity', activitySchema);
 
 export default Activity;
+

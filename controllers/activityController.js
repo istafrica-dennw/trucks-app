@@ -74,3 +74,4 @@ export const getActivityStatsController = async (req, res) => {
     });
   }
 };
+

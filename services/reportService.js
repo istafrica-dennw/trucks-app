@@ -53,7 +53,10 @@ export async function getCustomReport(startDate, endDate, groupBy = 'day', truck
       if (!map.has(key)) map.set(key, []);
       map.get(key).push(d);
     });
-    base.breakdown = Array.from(map.entries()).map(([date, arr]) => ({ date, ...calc(arr) }));
+    base.breakdown = Array.from(map.entries()).map(([date, arr]) => {
+      const breakdownData = calc(arr);
+      return { date, ...breakdownData };
+    });
   }
   return base;
 }
@@ -69,16 +72,52 @@ function summarize(drives, meta = {}) {
   return { ...meta, summary: calc(drives) };
 }
 
+// Helper function to convert amount to RWF
+function convertToRWF(amount, currency, exchangeRate) {
+  if (!amount || !currency) return 0;
+  if (currency === 'RWF') return amount;
+  return amount * (exchangeRate || 1);
+}
+
 function calc(drives) {
   const totalDrives = drives.length;
   let totalAmount = 0, totalExpenses = 0, totalPaid = 0;
+  const exchangeRates = {}; // Track exchange rates used
+  
   drives.forEach(d => {
-    totalAmount += d.pay?.totalAmount || 0;
-    if (Array.isArray(d.expenses)) totalExpenses += d.expenses.reduce((s,e)=>s+(e.amount||0),0);
-    if (d.pay?.paidOption === 'full') totalPaid += d.pay.totalAmount || 0;
-    else if (Array.isArray(d.pay?.installments)) totalPaid += d.pay.installments.reduce((s,i)=>s+(i.amount||0),0);
+    const currency = d.pay?.currency || 'RWF';
+    const exchangeRate = d.pay?.exchangeRate || 1;
+    
+    // Track exchange rates for display
+    if (currency !== 'RWF' && !exchangeRates[currency]) {
+      exchangeRates[currency] = exchangeRate;
+    }
+    
+    // Convert amounts to RWF
+    const amountInRWF = convertToRWF(d.pay?.totalAmount || 0, currency, exchangeRate);
+    totalAmount += amountInRWF;
+    
+    // Expenses are always in RWF (or convert if needed)
+    if (Array.isArray(d.expenses)) {
+      totalExpenses += d.expenses.reduce((s,e)=>s+(e.amount||0),0);
+    }
+    
+    // Convert paid amounts to RWF
+    if (d.pay?.paidOption === 'full') {
+      totalPaid += convertToRWF(d.pay.totalAmount || 0, currency, exchangeRate);
+    } else if (Array.isArray(d.pay?.installments)) {
+      totalPaid += d.pay.installments.reduce((s,i)=>s+convertToRWF(i.amount||0, currency, exchangeRate),0);
+    }
   });
+  
   const netProfit = totalPaid - totalExpenses; // paid minus expenses (cash perspective)
-  return { totalDrives, totalAmount, totalExpenses, totalPaid, netProfit };
+  return { 
+    totalDrives, 
+    totalAmount, // in RWF
+    totalExpenses, // in RWF
+    totalPaid, // in RWF
+    netProfit, // in RWF
+    exchangeRates // Exchange rates used for display
+  };
 }
 

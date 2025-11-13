@@ -17,6 +17,7 @@ import driverRoutes from './routes/drivers.js';
 import driveRoutes from './routes/drives.js';
 import reportRoutes from './routes/reports.js';
 import activityRoutes from './routes/activities.js';
+import settingsRoutes from './routes/settings.js';
 import testRoutes from './routes/test.js';
 
 // Import middleware
@@ -91,6 +92,7 @@ app.use('/api/drivers', driverRoutes);
 app.use('/api/drives', driveRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/activities', activityRoutes);
+app.use('/api/settings', settingsRoutes);
 app.use('/test', testRoutes);
 
 // Error handling middleware (must be last)

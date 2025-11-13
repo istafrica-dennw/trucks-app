@@ -61,6 +61,13 @@ const paymentSchema = Joi.object({
     'number.min': 'Total amount cannot be negative',
     'number.base': 'Total amount must be a number'
   }),
+  currency: Joi.string().valid('USD', 'RWF', 'UGX', 'TZX').default('RWF').messages({
+    'any.only': 'Currency must be USD, RWF, UGX, or TZX'
+  }),
+  exchangeRate: Joi.number().min(0.01).default(1).messages({
+    'number.min': 'Exchange rate must be greater than 0',
+    'number.base': 'Exchange rate must be a number'
+  }),
   paidOption: Joi.string().valid('full', 'installment').required().messages({
     'any.only': 'Payment option must be either "full" or "installment"'
   }),

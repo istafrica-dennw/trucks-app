@@ -82,7 +82,10 @@ export const createDriveController = async (req, res) => {
     // Handle FormData (for file uploads) or JSON requests
     let driveData;
     
-    if (req.file) {
+    // Check if there are any files (payment proof or expense attachments)
+    const hasFiles = req.file || (req.files && Object.keys(req.files).length > 0);
+    
+    if (hasFiles) {
       // This is a FormData request with a file (full payment proof)
       // Extract data from FormData
       driveData = {
@@ -95,9 +98,38 @@ export const createDriveController = async (req, res) => {
         notes: req.body.notes || '',
         status: req.body.status || 'started',
         date: req.body.date || new Date(),
-        expenses: req.body.expenses ? (Array.isArray(req.body.expenses) ? req.body.expenses : JSON.parse(req.body.expenses)) : [],
+        expenses: (() => {
+          const expenses = req.body.expenses ? (Array.isArray(req.body.expenses) ? req.body.expenses : JSON.parse(req.body.expenses)) : [];
+          // Process expense attachments from FormData
+          return expenses.map((expense, index) => {
+            const expenseData = {
+              title: expense.title || req.body[`expenses[${index}][title]`],
+              amount: parseFloat(expense.amount || req.body[`expenses[${index}][amount]`] || 0),
+              note: expense.note || req.body[`expenses[${index}][note]`] || ''
+            };
+            
+            // Check if there's an attachment file for this expense
+            const attachmentKey = `expenses[${index}][attachment]`;
+            if (req.files && req.files[attachmentKey] && req.files[attachmentKey][0]) {
+              const file = req.files[attachmentKey][0];
+              expenseData.attachment = {
+                filename: file.originalname,
+                path: file.path,
+                mimetype: file.mimetype,
+                size: file.size
+              };
+            } else if (expense.attachment) {
+              // Preserve existing attachment if no new file is provided
+              expenseData.attachment = expense.attachment;
+            }
+            
+            return expenseData;
+          });
+        })(),
         pay: {
           totalAmount: parseFloat(req.body['pay[totalAmount]'] || req.body.pay?.totalAmount),
+          currency: req.body['pay[currency]'] || req.body.pay?.currency || 'RWF',
+          exchangeRate: parseFloat(req.body['pay[exchangeRate]'] || req.body.pay?.exchangeRate || 1),
           paidOption: req.body['pay[paidOption]'] || req.body.pay?.paidOption || 'full',
           installments: []
         }
@@ -158,7 +190,10 @@ export const updateDriveController = async (req, res) => {
     // Handle FormData (for file uploads) or JSON requests
     let updateData;
     
-    if (req.file) {
+    // Check if there are any files (payment proof or expense attachments)
+    const hasFiles = req.file || (req.files && Object.keys(req.files).length > 0);
+    
+    if (hasFiles) {
       // This is a FormData request with a file (full payment proof)
       // Extract data from FormData
       updateData = {
@@ -171,9 +206,38 @@ export const updateDriveController = async (req, res) => {
         notes: req.body.notes || '',
         status: req.body.status || 'started',
         date: req.body.date || new Date(),
-        expenses: req.body.expenses ? (Array.isArray(req.body.expenses) ? req.body.expenses : JSON.parse(req.body.expenses)) : [],
+        expenses: (() => {
+          const expenses = req.body.expenses ? (Array.isArray(req.body.expenses) ? req.body.expenses : JSON.parse(req.body.expenses)) : [];
+          // Process expense attachments from FormData
+          return expenses.map((expense, index) => {
+            const expenseData = {
+              title: expense.title || req.body[`expenses[${index}][title]`],
+              amount: parseFloat(expense.amount || req.body[`expenses[${index}][amount]`] || 0),
+              note: expense.note || req.body[`expenses[${index}][note]`] || ''
+            };
+            
+            // Check if there's an attachment file for this expense
+            const attachmentKey = `expenses[${index}][attachment]`;
+            if (req.files && req.files[attachmentKey] && req.files[attachmentKey][0]) {
+              const file = req.files[attachmentKey][0];
+              expenseData.attachment = {
+                filename: file.originalname,
+                path: file.path,
+                mimetype: file.mimetype,
+                size: file.size
+              };
+            } else if (expense.attachment) {
+              // Preserve existing attachment if no new file is provided
+              expenseData.attachment = expense.attachment;
+            }
+            
+            return expenseData;
+          });
+        })(),
         pay: {
           totalAmount: parseFloat(req.body['pay[totalAmount]'] || req.body.pay?.totalAmount),
+          currency: req.body['pay[currency]'] || req.body.pay?.currency || 'RWF',
+          exchangeRate: parseFloat(req.body['pay[exchangeRate]'] || req.body.pay?.exchangeRate || 1),
           paidOption: req.body['pay[paidOption]'] || req.body.pay?.paidOption || 'full',
           installments: req.body['pay[installments]'] ? (Array.isArray(req.body['pay[installments]']) ? req.body['pay[installments]'] : JSON.parse(req.body['pay[installments]'])) : []
         }
@@ -423,6 +487,79 @@ export const getDrivesByDateController = async (req, res) => {
       message: 'Failed to retrieve drives by date',
       error: error.message
     });
+  }
+};
+
+export const getExpenseProofController = async (req, res) => {
+  try {
+    const { id, expenseIndex } = req.params;
+    const index = parseInt(expenseIndex, 10);
+    
+    if (isNaN(index) || index < 0) {
+      return res.status(400).json({ success: false, message: 'Invalid expense index' });
+    }
+    
+    const drive = await getDriveById(id);
+    if (!drive) {
+      return res.status(404).json({ success: false, message: 'Journey not found' });
+    }
+    
+    const driveObj = drive.toObject ? drive.toObject() : drive;
+    
+    if (!driveObj.expenses || !Array.isArray(driveObj.expenses) || index >= driveObj.expenses.length) {
+      return res.status(404).json({ success: false, message: 'Expense not found' });
+    }
+    
+    const expense = driveObj.expenses[index];
+    if (!expense.attachment || !expense.attachment.path) {
+      logger.warn('Expense missing attachment', { driveId: id, expenseIndex: index });
+      return res.status(404).json({ success: false, message: 'Expense proof attachment not found' });
+    }
+    
+    const filePath = expense.attachment.path;
+    if (!fs.existsSync(filePath)) {
+      logger.error('Expense proof file not found on disk', { filePath, driveId: id, expenseIndex: index });
+      return res.status(404).json({ success: false, message: 'Expense proof file not found' });
+    }
+    
+    const stats = fs.statSync(filePath);
+    const actualFileSize = stats.size;
+    
+    if (actualFileSize !== expense.attachment.size) {
+      logger.warn('Expense proof file size mismatch', { 
+        expected: expense.attachment.size, 
+        actual: actualFileSize, 
+        driveId: id, 
+        expenseIndex: index 
+      });
+    }
+    
+    const filename = expense.attachment.filename || 'expense-proof';
+    res.setHeader('Content-Type', expense.attachment.mimetype || 'application/octet-stream');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Content-Length', actualFileSize);
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    
+    res.sendFile(path.resolve(filePath), (err) => {
+      if (err) {
+        logger.error('Error sending expense proof file', { 
+          filePath, 
+          error: err.message, 
+          stack: err.stack,
+          driveId: id,
+          expenseIndex: index
+        });
+        if (!res.headersSent) {
+          res.status(500).json({ success: false, message: 'Error sending file' });
+        }
+      }
+    });
+  } catch (error) {
+    logger.error('Error in getExpenseProofController', { error: error.message, stack: error.stack });
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, message: 'Failed to retrieve expense proof', error: error.message });
+    }
   }
 };
 
