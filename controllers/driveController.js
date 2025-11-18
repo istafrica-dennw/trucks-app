@@ -8,6 +8,7 @@ import {
   getDriveStats,
   getDrivesByTruck,
   getDrivesByDriver,
+  getDrivesByCustomer,
   getDrivesByDate
 } from '../services/driveService.js';
 import { createJourneyActivity, createPaymentActivity } from '../services/activityService.js';
@@ -466,6 +467,34 @@ export const getDrivesByDriverController = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to retrieve drives by driver',
+      error: error.message
+    });
+  }
+};
+
+export const getDrivesByCustomerController = async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    const filters = {
+      page: parseInt(req.query.page) || 1,
+      limit: parseInt(req.query.limit) || 10,
+      startDate: req.query.startDate,
+      endDate: req.query.endDate,
+      status: req.query.status || ''
+    };
+
+    const result = await getDrivesByCustomer(customerId, filters);
+
+    res.status(200).json({
+      success: true,
+      data: result.drives,
+      pagination: result.pagination
+    });
+  } catch (error) {
+    logger.error('Error in getDrivesByCustomerController', { error: error.message });
+    res.status(500).json({
+      success: false,
+      message: 'Failed to retrieve customer journeys',
       error: error.message
     });
   }

@@ -7,6 +7,14 @@ export const driveId = Joi.object({
   })
 });
 
+// Generic ObjectId validation - accepts any param name
+export const objectIdParam = Joi.object().unknown(true).pattern(
+  Joi.string(),
+  Joi.string().pattern(/^[0-9a-fA-F]{24}$/).required().messages({
+    'string.pattern.base': 'Invalid ID format'
+  })
+);
+
 // Get all drives validation
 export const getAllDrives = Joi.object({
   page: Joi.number().integer().min(1).default(1),
@@ -101,10 +109,9 @@ export const createDrive = Joi.object({
     'string.min': 'Cargo must be at least 1 character',
     'string.max': 'Cargo cannot exceed 200 characters'
   }),
-  customer: Joi.string().trim().min(1).max(100).required().messages({
-    'string.empty': 'Customer is required',
-    'string.min': 'Customer must be at least 1 character',
-    'string.max': 'Customer cannot exceed 100 characters'
+  customer: Joi.string().pattern(/^[0-9a-fA-F]{24}$/).required().messages({
+    'string.pattern.base': 'Invalid customer ID format',
+    'any.required': 'Customer is required'
   }),
   expenses: Joi.array().items(expenseSchema).default([]),
   pay: paymentSchema.required(),
@@ -137,9 +144,8 @@ export const updateDrive = Joi.object({
     'string.min': 'Cargo must be at least 1 character',
     'string.max': 'Cargo cannot exceed 200 characters'
   }),
-  customer: Joi.string().trim().min(1).max(100).messages({
-    'string.min': 'Customer must be at least 1 character',
-    'string.max': 'Customer cannot exceed 100 characters'
+  customer: Joi.string().pattern(/^[0-9a-fA-F]{24}$/).messages({
+    'string.pattern.base': 'Invalid customer ID format'
   }),
   expenses: Joi.array().items(expenseSchema),
   pay: paymentSchema,

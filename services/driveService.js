@@ -1,6 +1,7 @@
 import Drive from '../models/Drive.js';
 import Driver from '../models/Driver.js';
 import Truck from '../models/Truck.js';
+import Customer from '../models/Customer.js';
 import logger from '../utils/logger.js';
 
 export const getAllDrives = async (filters = {}) => {
@@ -27,12 +28,13 @@ export const getAllDrives = async (filters = {}) => {
     
     if (search) {
       query.$or = [
-        { customer: { $regex: search, $options: 'i' } },
         { cargo: { $regex: search, $options: 'i' } },
         { departureCity: { $regex: search, $options: 'i' } },
         { destinationCity: { $regex: search, $options: 'i' } },
         { notes: { $regex: search, $options: 'i' } }
       ];
+      // Note: Customer search is now done via populated field, so we search by customer name through aggregation
+      // For now, we'll exclude customer from text search since it's now a reference
     }
     
     if (status) {
@@ -48,7 +50,8 @@ export const getAllDrives = async (filters = {}) => {
     }
     
     if (customer) {
-      query.customer = { $regex: customer, $options: 'i' };
+      // Customer is now an ObjectId reference, so we match by ID
+      query.customer = customer;
     }
     
     if (departureCity) {
@@ -76,14 +79,37 @@ export const getAllDrives = async (filters = {}) => {
     // Calculate pagination
     const skip = (page - 1) * limit;
 
-    // Execute query
-    const drives = await Drive.find(query)
+    // Execute query - fetch without customer populate first to avoid ObjectId casting errors
+    const mongoose = (await import('mongoose')).default;
+    let drives = await Drive.find(query)
       .populate('driver', 'fullName phone')
       .populate('truck', 'plateNumber make model')
       .populate('createdBy', 'email')
       .sort(sort)
       .skip(skip)
-      .limit(limit);
+      .limit(limit)
+      .lean();
+    
+    // Manually populate valid customer ObjectIds only
+    for (const drive of drives) {
+      if (drive.customer) {
+        // Check if it's a valid ObjectId
+        if (mongoose.Types.ObjectId.isValid(drive.customer)) {
+          try {
+            const customer = await Customer.findById(drive.customer).select('name phone country').lean();
+            drive.customer = customer;
+          } catch (err) {
+            // Invalid customer reference, set to null
+            logger.warn('Invalid customer ObjectId in drive', { driveId: drive._id, customer: drive.customer });
+            drive.customer = null;
+          }
+        } else {
+          // Not a valid ObjectId (likely old string value), set to null
+          logger.warn('Customer field is not a valid ObjectId', { driveId: drive._id, customer: drive.customer });
+          drive.customer = null;
+        }
+      }
+    }
 
     const total = await Drive.countDocuments(query);
 
@@ -114,14 +140,33 @@ export const getAllDrives = async (filters = {}) => {
 
 export const getDriveById = async (driveId) => {
   try {
+    // Fetch without customer populate first to avoid ObjectId casting errors
+    const mongoose = (await import('mongoose')).default;
     const drive = await Drive.findById(driveId)
       .populate('driver', 'fullName phone email nationalId licenseNumber')
       .populate('truck', 'plateNumber make model year status')
-      .populate('createdBy', 'email');
+      .populate('createdBy', 'email')
+      .lean();
     
     if (!drive) {
       logger.warn('Drive not found', { driveId });
       return null;
+    }
+    
+    // Manually populate customer if it's a valid ObjectId
+    if (drive.customer) {
+      if (mongoose.Types.ObjectId.isValid(drive.customer)) {
+        try {
+          const customer = await Customer.findById(drive.customer).select('name phone country').lean();
+          drive.customer = customer;
+        } catch (err) {
+          logger.warn('Invalid customer ObjectId in drive', { driveId, customer: drive.customer });
+          drive.customer = null;
+        }
+      } else {
+        logger.warn('Customer field is not a valid ObjectId', { driveId, customer: drive.customer });
+        drive.customer = null;
+      }
     }
     
     // Ensure balance is recalculated using the virtual (in case stored balance is outdated)
@@ -168,6 +213,13 @@ export const createDrive = async (driveData, userId) => {
       throw new Error('Truck not found');
     }
 
+    // Verify customer exists
+    const customer = await Customer.findById(driveData.customer);
+    if (!customer) {
+      logger.warn('Drive creation failed - customer not found', { customerId: driveData.customer });
+      throw new Error('Customer not found');
+    }
+
     // Validate payment structure
     if (driveData.pay.paidOption === 'full') {
       driveData.pay.installments = [];
@@ -179,12 +231,24 @@ export const createDrive = async (driveData, userId) => {
     const drive = new Drive(driveData);
     await drive.save();
 
-    // Populate the created drive
+    // Populate the created drive - manually populate customer to handle edge cases
+    const mongoose = (await import('mongoose')).default;
     const populatedDrive = await Drive.findById(drive._id)
       .populate('driver', 'fullName phone')
       .populate('truck', 'plateNumber make model')
       .populate('createdBy', 'email')
       .lean();
+    
+    // Manually populate customer if it's a valid ObjectId
+    if (populatedDrive.customer && mongoose.Types.ObjectId.isValid(populatedDrive.customer)) {
+      try {
+        const customer = await Customer.findById(populatedDrive.customer).select('name phone country').lean();
+        populatedDrive.customer = customer;
+      } catch (err) {
+        logger.warn('Invalid customer ObjectId in drive', { driveId: populatedDrive._id, customer: populatedDrive.customer });
+        populatedDrive.customer = null;
+      }
+    }
 
     logger.info('Drive created successfully', { 
       driveId: drive._id,
@@ -234,17 +298,19 @@ export const updateDrive = async (driveId, updateData) => {
         updateData.pay.installments = updateData.pay.installments.map((newInst, index) => {
           // If this installment already exists at this index, preserve its attachment
           const existingInst = drive.pay.installments && drive.pay.installments[index];
-          if (existingInst && existingInst.attachment) {
+          const installmentData = { ...newInst };
+          
+          // Only include attachment if it has all required fields
+          if (newInst.attachment && newInst.attachment.filename && newInst.attachment.path) {
+            // New attachment is complete, use it
+            installmentData.attachment = newInst.attachment;
+          } else if (existingInst && existingInst.attachment && existingInst.attachment.filename && existingInst.attachment.path) {
             // Preserve existing attachment if new data doesn't have it or has incomplete attachment data
-            if (!newInst.attachment || !newInst.attachment.filename || !newInst.attachment.path) {
-              return {
-                ...newInst,
-                attachment: existingInst.attachment
-              };
-            }
+            installmentData.attachment = existingInst.attachment;
           }
-          // Otherwise, use the new installment data as-is (should have complete attachment if provided)
-          return newInst;
+          // If neither has a valid attachment, don't include the attachment field
+          
+          return installmentData;
         });
       }
     }
@@ -287,11 +353,20 @@ export const updateDrive = async (driveId, updateData) => {
           }
           
           // Otherwise use new installment data (which should have attachment if it's a new one)
-          return {
+          const installmentData = {
             amount: parseFloat(newInst.amount),
-            date: newInst.date ? new Date(newInst.date) : new Date(),
-            attachment: newInst.attachment || existingInst?.attachment
+            date: newInst.date ? new Date(newInst.date) : new Date()
           };
+          
+          // Only include attachment if it has all required fields
+          if (newInst.attachment && newInst.attachment.filename && newInst.attachment.path) {
+            installmentData.attachment = newInst.attachment;
+          } else if (existingInst?.attachment && existingInst.attachment.filename && existingInst.attachment.path) {
+            installmentData.attachment = existingInst.attachment;
+          }
+          // If neither has a valid attachment, don't include the attachment field
+          
+          return installmentData;
         });
         
         drive.pay.installments = updatedInstallments;
@@ -334,12 +409,24 @@ export const updateDrive = async (driveId, updateData) => {
     
     await drive.save();
 
-    // Populate the updated drive
+    // Populate the updated drive - manually populate customer to handle edge cases
+    const mongoose = (await import('mongoose')).default;
     const populatedDrive = await Drive.findById(driveId)
       .populate('driver', 'fullName phone')
       .populate('truck', 'plateNumber make model')
       .populate('createdBy', 'email')
       .lean();
+    
+    // Manually populate customer if it's a valid ObjectId
+    if (populatedDrive.customer && mongoose.Types.ObjectId.isValid(populatedDrive.customer)) {
+      try {
+        const customer = await Customer.findById(populatedDrive.customer).select('name phone country').lean();
+        populatedDrive.customer = customer;
+      } catch (err) {
+        logger.warn('Invalid customer ObjectId in drive', { driveId, customer: populatedDrive.customer });
+        populatedDrive.customer = null;
+      }
+    }
 
     logger.info('Drive updated successfully', { 
       driveId,
@@ -393,12 +480,24 @@ export const addInstallment = async (driveId, installmentData) => {
     // Add installment using the model method
     await drive.addInstallment(installmentData);
 
-    // Populate the updated drive
+    // Populate the updated drive - manually populate customer to handle edge cases
+    const mongoose = (await import('mongoose')).default;
     const populatedDrive = await Drive.findById(driveId)
       .populate('driver', 'fullName phone')
       .populate('truck', 'plateNumber make model')
       .populate('createdBy', 'email')
       .lean();
+    
+    // Manually populate customer if it's a valid ObjectId
+    if (populatedDrive.customer && mongoose.Types.ObjectId.isValid(populatedDrive.customer)) {
+      try {
+        const customer = await Customer.findById(populatedDrive.customer).select('name phone country').lean();
+        populatedDrive.customer = customer;
+      } catch (err) {
+        logger.warn('Invalid customer ObjectId in drive', { driveId, customer: populatedDrive.customer });
+        populatedDrive.customer = null;
+      }
+    }
 
     logger.info('Installment added successfully', { 
       driveId,
@@ -487,8 +586,9 @@ export const getDrivesByTruck = async (truckId, filters = {}) => {
     // Calculate pagination
     const skip = (page - 1) * limit;
 
-    // Execute query
-    const drives = await Drive.find(query)
+    // Execute query - fetch without customer populate first to avoid ObjectId casting errors
+    const mongoose = (await import('mongoose')).default;
+    let drives = await Drive.find(query)
       .populate('driver', 'fullName phone')
       .populate('truck', 'plateNumber make model')
       .populate('createdBy', 'email')
@@ -496,6 +596,27 @@ export const getDrivesByTruck = async (truckId, filters = {}) => {
       .skip(skip)
       .limit(limit)
       .lean();
+    
+    // Manually populate valid customer ObjectIds only
+    for (const drive of drives) {
+      if (drive.customer) {
+        // Check if it's a valid ObjectId
+        if (mongoose.Types.ObjectId.isValid(drive.customer)) {
+          try {
+            const customer = await Customer.findById(drive.customer).select('name phone country').lean();
+            drive.customer = customer;
+          } catch (err) {
+            // Invalid customer reference, set to null
+            logger.warn('Invalid customer ObjectId in drive', { driveId: drive._id, customer: drive.customer });
+            drive.customer = null;
+          }
+        } else {
+          // Not a valid ObjectId (likely old string value), set to null
+          logger.warn('Customer field is not a valid ObjectId', { driveId: drive._id, customer: drive.customer });
+          drive.customer = null;
+        }
+      }
+    }
 
     const total = await Drive.countDocuments(query);
 
@@ -547,8 +668,9 @@ export const getDrivesByDriver = async (driverId, filters = {}) => {
     // Calculate pagination
     const skip = (page - 1) * limit;
 
-    // Execute query
-    const drives = await Drive.find(query)
+    // Execute query - fetch without customer populate first to avoid ObjectId casting errors
+    const mongoose = (await import('mongoose')).default;
+    let drives = await Drive.find(query)
       .populate('driver', 'fullName phone')
       .populate('truck', 'plateNumber make model')
       .populate('createdBy', 'email')
@@ -556,6 +678,27 @@ export const getDrivesByDriver = async (driverId, filters = {}) => {
       .skip(skip)
       .limit(limit)
       .lean();
+    
+    // Manually populate valid customer ObjectIds only
+    for (const drive of drives) {
+      if (drive.customer) {
+        // Check if it's a valid ObjectId
+        if (mongoose.Types.ObjectId.isValid(drive.customer)) {
+          try {
+            const customer = await Customer.findById(drive.customer).select('name phone country').lean();
+            drive.customer = customer;
+          } catch (err) {
+            // Invalid customer reference, set to null
+            logger.warn('Invalid customer ObjectId in drive', { driveId: drive._id, customer: drive.customer });
+            drive.customer = null;
+          }
+        } else {
+          // Not a valid ObjectId (likely old string value), set to null
+          logger.warn('Customer field is not a valid ObjectId', { driveId: drive._id, customer: drive.customer });
+          drive.customer = null;
+        }
+      }
+    }
 
     const total = await Drive.countDocuments(query);
 
@@ -581,6 +724,88 @@ export const getDrivesByDriver = async (driverId, filters = {}) => {
   }
 };
 
+export const getDrivesByCustomer = async (customerId, filters = {}) => {
+  try {
+    const {
+      page = 1,
+      limit = 10,
+      startDate,
+      endDate,
+      status = ''
+    } = filters;
+
+    // Build query
+    const query = { customer: customerId };
+    
+    if (startDate || endDate) {
+      query.date = {};
+      if (startDate) query.date.$gte = new Date(startDate);
+      if (endDate) query.date.$lte = new Date(endDate);
+    }
+    
+    if (status) {
+      query.status = status;
+    }
+
+    // Calculate pagination
+    const skip = (page - 1) * limit;
+
+    // Execute query - fetch without customer populate first to avoid ObjectId casting errors
+    const mongoose = (await import('mongoose')).default;
+    let drives = await Drive.find(query)
+      .populate('driver', 'fullName phone')
+      .populate('truck', 'plateNumber make model')
+      .populate('createdBy', 'email')
+      .sort({ date: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+    
+    // Manually populate valid customer ObjectIds only
+    for (const drive of drives) {
+      if (drive.customer) {
+        // Check if it's a valid ObjectId
+        if (mongoose.Types.ObjectId.isValid(drive.customer)) {
+          try {
+            const customer = await Customer.findById(drive.customer).select('name phone country').lean();
+            drive.customer = customer;
+          } catch (err) {
+            // Invalid customer reference, set to null
+            logger.warn('Invalid customer ObjectId in drive', { driveId: drive._id, customer: drive.customer });
+            drive.customer = null;
+          }
+        } else {
+          // Not a valid ObjectId (likely old string value), set to null
+          logger.warn('Customer field is not a valid ObjectId', { driveId: drive._id, customer: drive.customer });
+          drive.customer = null;
+        }
+      }
+    }
+
+    const total = await Drive.countDocuments(query);
+
+    logger.info('Retrieved drives by customer', { 
+      customerId,
+      total,
+      page,
+      limit
+    });
+
+    return {
+      drives,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit)
+      }
+    };
+  } catch (error) {
+    logger.error('Error retrieving drives by customer', { customerId, error: error.message });
+    throw error;
+  }
+};
+
 export const getDrivesByDate = async (date) => {
   try {
     const startOfDay = new Date(date);
@@ -589,7 +814,9 @@ export const getDrivesByDate = async (date) => {
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
-    const drives = await Drive.find({
+    // Execute query - fetch without customer populate first to avoid ObjectId casting errors
+    const mongoose = (await import('mongoose')).default;
+    let drives = await Drive.find({
       date: {
         $gte: startOfDay,
         $lte: endOfDay
@@ -600,6 +827,27 @@ export const getDrivesByDate = async (date) => {
       .populate('createdBy', 'email')
       .sort({ date: -1 })
       .lean();
+    
+    // Manually populate valid customer ObjectIds only
+    for (const drive of drives) {
+      if (drive.customer) {
+        // Check if it's a valid ObjectId
+        if (mongoose.Types.ObjectId.isValid(drive.customer)) {
+          try {
+            const customer = await Customer.findById(drive.customer).select('name phone country').lean();
+            drive.customer = customer;
+          } catch (err) {
+            // Invalid customer reference, set to null
+            logger.warn('Invalid customer ObjectId in drive', { driveId: drive._id, customer: drive.customer });
+            drive.customer = null;
+          }
+        } else {
+          // Not a valid ObjectId (likely old string value), set to null
+          logger.warn('Customer field is not a valid ObjectId', { driveId: drive._id, customer: drive.customer });
+          drive.customer = null;
+        }
+      }
+    }
 
     logger.info('Retrieved drives by date', { 
       date,

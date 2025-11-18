@@ -4,6 +4,7 @@ import { validate, validateParams, validateQuery } from '../middleware/validatio
 import { uploadPaymentProof } from '../middleware/upload.js';
 import {
   driveId,
+  objectIdParam,
   getAllDrives,
   createDrive,
   updateDrive,
@@ -19,6 +20,7 @@ import {
   getDriveStatsController,
   getDrivesByTruckController,
   getDrivesByDriverController,
+  getDrivesByCustomerController,
   getDrivesByDateController,
   getPaymentProofController,
   getFullPaymentProofController,
@@ -47,14 +49,20 @@ router.get('/by-day/:date',
 
 // GET /api/drives/by-truck/:truckId - Get drives for specific truck
 router.get('/by-truck/:truckId', 
-  validateParams(driveId),
+  validateParams(objectIdParam),
   getDrivesByTruckController
 );
 
 // GET /api/drives/by-driver/:driverId - Get drives for specific driver
 router.get('/by-driver/:driverId', 
-  validateParams(driveId),
+  validateParams(objectIdParam),
   getDrivesByDriverController
+);
+
+// GET /api/drives/by-customer/:customerId - Get drives for specific customer
+router.get('/by-customer/:customerId', 
+  validateParams(objectIdParam),
+  getDrivesByCustomerController
 );
 
 // POST /api/drives - Create new drive (admin/officer only)

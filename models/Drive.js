@@ -27,9 +27,9 @@ const driveSchema = new mongoose.Schema({
     trim: true
   },
   customer: {
-    type: String,
-    required: [true, 'Customer is required'],
-    trim: true
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Customer',
+    required: [true, 'Customer is required']
   },
   expenses: [{
     title: {
@@ -119,19 +119,19 @@ const driveSchema = new mongoose.Schema({
       attachment: {
         filename: {
           type: String,
-          required: [true, 'Proof of payment attachment is required']
+          required: false
         },
         path: {
           type: String,
-          required: [true, 'Attachment path is required']
+          required: false
         },
         mimetype: {
           type: String,
-          required: [true, 'Attachment MIME type is required']
+          required: false
         },
         size: {
           type: Number,
-          required: [true, 'Attachment size is required']
+          required: false
         }
       }
     }]
@@ -285,11 +285,11 @@ driveSchema.statics.findByDriver = function(driverId, limit = 50) {
 };
 
 // Static method to find journeys by customer
-driveSchema.statics.findByCustomer = function(customer, limit = 50) {
-  return this.find({ customer: { $regex: customer, $options: 'i' } })
+driveSchema.statics.findByCustomer = function(customerId, limit = 50) {
+  return this.find({ customer: customerId })
     .sort({ date: -1 })
     .limit(limit)
-    .populate('truck driver createdBy');
+    .populate('truck driver customer createdBy');
 };
 
 // Static method to get journey statistics
