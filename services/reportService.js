@@ -4,8 +4,8 @@ import mongoose from 'mongoose';
 function startOfDay(d) { const x = new Date(d); x.setHours(0,0,0,0); return x; }
 function endOfDay(d) { const x = new Date(d); x.setHours(23,59,59,999); return x; }
 
-// Helper function to convert truckId to ObjectId
-function toObjectId(id) {
+// Helper function to convert id to ObjectId
+function toObjectId(id, fieldName = 'id') {
   if (!id || id === '' || id === 'null' || id === 'undefined') return null;
   
   // If it's already an ObjectId, return as is
@@ -19,7 +19,7 @@ function toObjectId(id) {
       // Explicitly convert to ObjectId for Mongoose v8
       return new mongoose.Types.ObjectId(id);
     } catch (e) {
-      console.error('Error converting truckId to ObjectId:', e, 'truckId:', id);
+      console.error(`Error converting ${fieldName} to ObjectId:`, e, `${fieldName}:`, id);
       return null;
     }
   }
@@ -27,24 +27,33 @@ function toObjectId(id) {
   return null;
 }
 
-export async function getDailyReport(date, truckId = null) {
+export async function getDailyReport(date, truckId = null, customerId = null) {
   const start = startOfDay(date);
   const end = endOfDay(date);
   const query = { date: { $gte: start, $lte: end } };
   if (truckId) {
     // Explicitly convert truckId to ObjectId
-    const objectIdTruckId = toObjectId(truckId);
+    const objectIdTruckId = toObjectId(truckId, 'truckId');
     if (objectIdTruckId) {
       query.truck = objectIdTruckId;
     } else {
       console.warn('Invalid truckId, skipping filter:', truckId);
     }
   }
+  if (customerId) {
+    // Explicitly convert customerId to ObjectId
+    const objectIdCustomerId = toObjectId(customerId, 'customerId');
+    if (objectIdCustomerId) {
+      query.customer = objectIdCustomerId;
+    } else {
+      console.warn('Invalid customerId, skipping filter:', customerId);
+    }
+  }
   const drives = await Drive.find(query);
   return summarize(drives, { date: start.toISOString().slice(0,10) });
 }
 
-export async function getWeeklyReport(isoWeek, truckId = null) {
+export async function getWeeklyReport(isoWeek, truckId = null, customerId = null) {
   // isoWeek format: YYYY-Www
   const [year, week] = isoWeek.split('-W').map(Number);
   const firstThursday = new Date(Date.UTC(year, 0, 4));
@@ -56,11 +65,20 @@ export async function getWeeklyReport(isoWeek, truckId = null) {
   const query = { date: { $gte: start, $lte: end } };
   if (truckId) {
     // Explicitly convert truckId to ObjectId
-    const objectIdTruckId = toObjectId(truckId);
+    const objectIdTruckId = toObjectId(truckId, 'truckId');
     if (objectIdTruckId) {
       query.truck = objectIdTruckId;
     } else {
       console.warn('Invalid truckId, skipping filter:', truckId);
+    }
+  }
+  if (customerId) {
+    // Explicitly convert customerId to ObjectId
+    const objectIdCustomerId = toObjectId(customerId, 'customerId');
+    if (objectIdCustomerId) {
+      query.customer = objectIdCustomerId;
+    } else {
+      console.warn('Invalid customerId, skipping filter:', customerId);
     }
   }
   const drives = await Drive.find(query);
@@ -68,7 +86,7 @@ export async function getWeeklyReport(isoWeek, truckId = null) {
   return summary;
 }
 
-export async function getMonthlyReport(month, truckId = null) {
+export async function getMonthlyReport(month, truckId = null, customerId = null) {
   // month format: YYYY-MM
   const [y, m] = month.split('-').map(Number);
   const start = new Date(Date.UTC(y, m - 1, 1));
@@ -76,26 +94,42 @@ export async function getMonthlyReport(month, truckId = null) {
   const query = { date: { $gte: start, $lte: end } };
   if (truckId) {
     // Explicitly convert truckId to ObjectId
-    const objectIdTruckId = toObjectId(truckId);
+    const objectIdTruckId = toObjectId(truckId, 'truckId');
     if (objectIdTruckId) {
       query.truck = objectIdTruckId;
     } else {
       console.warn('Invalid truckId, skipping filter:', truckId);
     }
   }
+  if (customerId) {
+    // Explicitly convert customerId to ObjectId
+    const objectIdCustomerId = toObjectId(customerId, 'customerId');
+    if (objectIdCustomerId) {
+      query.customer = objectIdCustomerId;
+    } else {
+      console.warn('Invalid customerId, skipping filter:', customerId);
+    }
+  }
   const drives = await Drive.find(query);
   return summarize(drives, { month });
 }
 
-export async function getCustomReport(startDate, endDate, groupBy = 'day', truckId = null) {
+export async function getCustomReport(startDate, endDate, groupBy = 'day', truckId = null, customerId = null) {
   const start = startOfDay(startDate);
   const end = endOfDay(endDate);
   const query = { date: { $gte: start, $lte: end } };
   if (truckId) {
     // Explicitly convert truckId to ObjectId
-    const objectIdTruckId = toObjectId(truckId);
+    const objectIdTruckId = toObjectId(truckId, 'truckId');
     if (objectIdTruckId) {
       query.truck = objectIdTruckId;
+    }
+  }
+  if (customerId) {
+    // Explicitly convert customerId to ObjectId
+    const objectIdCustomerId = toObjectId(customerId, 'customerId');
+    if (objectIdCustomerId) {
+      query.customer = objectIdCustomerId;
     }
   }
   const drives = await Drive.find(query);
@@ -115,15 +149,24 @@ export async function getCustomReport(startDate, endDate, groupBy = 'day', truck
   return base;
 }
 
-export async function getSummary(truckId = null) {
+export async function getSummary(truckId = null, customerId = null) {
   const query = {};
   if (truckId) {
     // Explicitly convert truckId to ObjectId
-    const objectIdTruckId = toObjectId(truckId);
+    const objectIdTruckId = toObjectId(truckId, 'truckId');
     if (objectIdTruckId) {
       query.truck = objectIdTruckId;
     } else {
       console.warn('Invalid truckId, skipping filter:', truckId);
+    }
+  }
+  if (customerId) {
+    // Explicitly convert customerId to ObjectId
+    const objectIdCustomerId = toObjectId(customerId, 'customerId');
+    if (objectIdCustomerId) {
+      query.customer = objectIdCustomerId;
+    } else {
+      console.warn('Invalid customerId, skipping filter:', customerId);
     }
   }
   const drives = await Drive.find(query);
@@ -173,11 +216,13 @@ function calc(drives) {
   });
   
   const netProfit = totalPaid - totalExpenses; // paid minus expenses (cash perspective)
+  const balance = totalAmount - totalPaid; // unpaid amount (total revenue - total paid)
   return { 
     totalDrives, 
     totalAmount, // in RWF
     totalExpenses, // in RWF
     totalPaid, // in RWF
+    balance, // in RWF (unpaid amount)
     netProfit, // in RWF
     exchangeRates // Exchange rates used for display
   };
