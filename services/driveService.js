@@ -90,7 +90,7 @@ export const getAllDrives = async (filters = {}) => {
       .limit(limit)
       .lean();
     
-    // Manually populate valid customer ObjectIds only
+    // Manually populate valid customer ObjectIds and calculate virtual fields
     for (const drive of drives) {
       if (drive.customer) {
         // Check if it's a valid ObjectId
@@ -109,6 +109,36 @@ export const getAllDrives = async (filters = {}) => {
           drive.customer = null;
         }
       }
+      
+      // Calculate totalExpenses manually (since .lean() doesn't include virtuals)
+      const totalExpensesRWF = (drive.expenses && Array.isArray(drive.expenses))
+        ? drive.expenses.reduce((total, expense) => total + (expense.amount || 0), 0)
+        : 0;
+      
+      // Calculate totalPaid manually (since .lean() doesn't include virtuals)
+      let totalPaid = 0;
+      if (drive.pay?.paidOption === 'full') {
+        totalPaid = drive.pay.totalAmount || 0;
+      } else if (drive.pay?.installments && Array.isArray(drive.pay.installments)) {
+        totalPaid = drive.pay.installments.reduce((total, installment) => total + (installment.amount || 0), 0);
+      }
+      
+      // Add calculated values to the drive object
+      drive.totalExpenses = totalExpensesRWF;
+      drive.totalPaid = totalPaid;
+      
+      // Calculate balance
+      const currency = drive.pay?.currency || 'RWF';
+      const exchangeRate = drive.pay?.exchangeRate || 1;
+      
+      let totalExpensesInCurrency = totalExpensesRWF;
+      if (currency !== 'RWF') {
+        totalExpensesInCurrency = totalExpensesRWF / exchangeRate;
+      }
+      
+      const balance = totalPaid - totalExpensesInCurrency;
+      drive.balance = balance;
+      drive.calculatedBalance = balance;
     }
 
     const total = await Drive.countDocuments(query);
@@ -169,10 +199,23 @@ export const getDriveById = async (driveId) => {
       }
     }
     
-    // Ensure balance is recalculated using the virtual (in case stored balance is outdated)
-    // The virtual will be included in toJSON/toObject, but we also update the stored value
-    const totalPaid = drive.totalPaid || 0;
-    const totalExpensesRWF = drive.totalExpenses || 0;
+    // Calculate totalExpenses manually (since .lean() doesn't include virtuals)
+    const totalExpensesRWF = (drive.expenses && Array.isArray(drive.expenses))
+      ? drive.expenses.reduce((total, expense) => total + (expense.amount || 0), 0)
+      : 0;
+    
+    // Calculate totalPaid manually (since .lean() doesn't include virtuals)
+    let totalPaid = 0;
+    if (drive.pay?.paidOption === 'full') {
+      totalPaid = drive.pay.totalAmount || 0;
+    } else if (drive.pay?.installments && Array.isArray(drive.pay.installments)) {
+      totalPaid = drive.pay.installments.reduce((total, installment) => total + (installment.amount || 0), 0);
+    }
+    
+    // Add calculated values to the drive object
+    drive.totalExpenses = totalExpensesRWF;
+    drive.totalPaid = totalPaid;
+    
     const currency = drive.pay?.currency || 'RWF';
     const exchangeRate = drive.pay?.exchangeRate || 1;
     
@@ -181,10 +224,13 @@ export const getDriveById = async (driveId) => {
       totalExpensesInCurrency = totalExpensesRWF / exchangeRate;
     }
     
-    // Update balance if it's different (to fix any old incorrect balances)
+    // Calculate balance
     const correctBalance = totalPaid - totalExpensesInCurrency;
-    if (Math.abs(drive.balance - correctBalance) > 0.01) {
-      drive.balance = correctBalance;
+    drive.balance = correctBalance;
+    drive.calculatedBalance = correctBalance;
+    
+    // Update stored balance if it's different (to fix any old incorrect balances)
+    if (Math.abs((drive.balance || 0) - correctBalance) > 0.01) {
       // Save without triggering validation to avoid infinite loops
       await Drive.findByIdAndUpdate(driveId, { balance: correctBalance }, { runValidators: false });
     }
@@ -271,6 +317,12 @@ export const updateDrive = async (driveId, updateData) => {
     if (!drive) {
       logger.warn('Drive update failed - drive not found', { driveId });
       throw new Error('Drive not found');
+    }
+
+    // Prevent editing completed journeys (except for status changes from completed to started)
+    if (drive.status === 'completed' && updateData.status !== 'started') {
+      logger.warn('Attempt to edit completed journey blocked', { driveId, currentStatus: drive.status });
+      throw new Error('Cannot edit a completed journey. Only status can be changed back to started.');
     }
 
     // Check if trying to complete journey with incomplete payment
